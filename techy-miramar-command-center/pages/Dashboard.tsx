@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
+import {
+  Calendar,
+  Clock,
+  CheckCircle2,
   ArrowRight,
   MoreHorizontal,
   Plus,
@@ -10,7 +10,9 @@ import {
   Mail,
   TrendingUp,
   AlertCircle,
-  MessageSquare
+  MessageSquare,
+  Moon,
+  AlertTriangle,
 } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
@@ -167,6 +169,32 @@ const Dashboard: React.FC = () => {
                 </button>
             </div>
 
+            {/* Night Shift Morning Report */}
+            <div className="glass-card rounded-2xl p-6 border-t-4 border-purple-500">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                        <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center mr-3">
+                            <Moon className="w-4 h-4 text-purple-400" />
+                        </div>
+                        <h3 className="font-bold text-white">Night Shift Report</h3>
+                    </div>
+                    <span className="text-xs text-gray-500">2 tasks ran</span>
+                </div>
+                <ul className="space-y-2 mb-4">
+                    <li className="flex items-start text-sm text-gray-300">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 mr-2 flex-shrink-0" />
+                        Blog posts ready for review (2 drafts)
+                    </li>
+                    <li className="flex items-start text-sm text-gray-300">
+                        <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 mr-2 flex-shrink-0" />
+                        Site audit found 1 critical issue
+                    </li>
+                </ul>
+                <button className="w-full py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 text-sm font-medium rounded-lg transition-colors flex items-center justify-center">
+                    Review All <ArrowRight size={14} className="ml-1" />
+                </button>
+            </div>
+
             <div className="glass-card rounded-2xl p-6">
                  <h3 className="font-bold text-white mb-4">Active Sprints</h3>
                  <div className="space-y-4">
@@ -199,7 +227,7 @@ const Dashboard: React.FC = () => {
                 <ul className="space-y-3">
                     <li className="flex items-start text-sm text-gray-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 mr-2 flex-shrink-0"></span>
-                        Client "John D" ticket stalled > 48h.
+                        Client &quot;John D&quot; ticket stalled &gt; 48h.
                     </li>
                     <li className="flex items-start text-sm text-gray-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 mr-2 flex-shrink-0"></span>
