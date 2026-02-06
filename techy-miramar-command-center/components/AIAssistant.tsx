@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Send, X, Bot, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Send, X, Bot } from 'lucide-react';
 
 interface AIAssistantProps {
   isOpen: boolean;
@@ -14,6 +14,16 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
   ]);
   const [input, setInput] = useState('');
 
+  // Escape key closes panel
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleSend = () => {
     if (!input.trim()) return;
     setMessages([...messages, { id: Date.now(), sender: 'user', text: input }]);
@@ -26,7 +36,11 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 h-screen w-96 bg-[#09090b]/95 backdrop-blur-xl border-l border-white/10 shadow-2xl z-50 flex flex-col animate-fade-in">
+    <div
+      className="fixed right-0 top-0 h-screen w-96 bg-[#09090b]/95 backdrop-blur-xl border-l border-white/10 shadow-2xl z-50 flex flex-col animate-fade-in"
+      role="complementary"
+      aria-label="AI Copilot panel"
+    >
       {/* Header */}
       <div className="p-5 border-b border-white/5 flex justify-between items-center">
         <div className="flex items-center space-x-3">
@@ -41,7 +55,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
                 </p>
             </div>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors" aria-label="Close copilot panel">
             <X size={18} />
         </button>
       </div>
@@ -72,8 +86,8 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
                     </div>
                 )}
                 <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                    msg.sender === 'user' 
-                    ? 'bg-blue-600 text-white rounded-br-none' 
+                    msg.sender === 'user'
+                    ? 'bg-blue-600 text-white rounded-br-none'
                     : 'bg-gray-800 text-gray-200 rounded-bl-none border border-white/5'
                 }`}>
                     {msg.text}
@@ -85,17 +99,19 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
       {/* Input */}
       <div className="p-4 border-t border-white/5 bg-black/20">
         <div className="relative">
-            <input 
-                type="text" 
+            <input
+                type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                maxLength={2000}
                 placeholder="Ask Copilot to organize tasks..."
                 className="w-full bg-gray-900/50 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             />
-            <button 
+            <button
                 onClick={handleSend}
                 className="absolute right-2 top-2 p-1.5 bg-indigo-500 hover:bg-indigo-600 rounded-lg text-white transition-colors"
+                aria-label="Send message"
             >
                 <Send size={14} />
             </button>

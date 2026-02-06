@@ -41,15 +41,19 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
   return (
     <>
       <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button 
+        <button
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className="p-2 glass-panel rounded-lg text-white shadow-lg"
+          aria-label={isMobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
         >
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      <aside className={`
+      <aside
+        role="navigation"
+        aria-label="Main navigation"
+        className={`
         fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ease-in-out border-r border-gray-800/50 bg-black/40 backdrop-blur-xl w-[260px]
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>

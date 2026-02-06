@@ -78,7 +78,7 @@ const Plan: React.FC = () => {
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white border border-white/10">v2.2</span>
                 <span className="text-gray-500 text-xs font-mono uppercase">Sequenced Execution Plan</span>
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Master Plan 2025</h1>
+            <h1 className="text-4xl font-bold text-white tracking-tight">Master Plan 2026</h1>
             <p className="text-gray-400 mt-2 max-w-2xl text-sm leading-relaxed">
                 "Ship one thing at a time. Revenue before features. Kill what doesn't work."
             </p>
@@ -205,7 +205,7 @@ const Plan: React.FC = () => {
                     </div>
                     <div>
                         <div className="flex justify-between text-xs mb-1">
-                            <span className="text-emerald-400 font-bold">Target (Q4 2025)</span>
+                            <span className="text-emerald-400 font-bold">Target (Q4 2026)</span>
                             <span className="text-emerald-400 font-mono font-bold">$19,000</span>
                         </div>
                         <div className="w-full bg-gray-800 rounded-full h-2">

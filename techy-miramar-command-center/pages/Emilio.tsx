@@ -19,7 +19,7 @@ const recentReplies = [
 const Emilio: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold text-white tracking-tight">Emilio Engine</h1>
+      <h1 className="text-4xl font-bold text-white tracking-tight">Emilio Engine</h1>
       
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

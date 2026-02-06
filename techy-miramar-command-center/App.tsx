@@ -12,8 +12,21 @@ import AIWorkspace from './pages/AIWorkspace';
 import NightShift from './pages/NightShift';
 import Voice from './pages/Voice';
 
-// Simple placeholder components for pages not fully detailed in the file list
-const ReviewGuard = () => <div className="p-10 text-center text-gray-500 glass-card rounded-xl m-10">ReviewGuard Module Loading...</div>;
+const ReviewGuard = () => (
+  <div className="space-y-6 animate-fade-in">
+    <h1 className="text-4xl font-bold text-white tracking-tight">ReviewGuard</h1>
+    <div className="glass-card rounded-2xl p-12 text-center border border-white/5">
+      <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+        <span className="text-2xl">🛡️</span>
+      </div>
+      <h2 className="text-xl font-semibold text-white mb-2">Coming Soon</h2>
+      <p className="text-gray-400 max-w-md mx-auto">
+        ReviewGuard will manage Google review monitoring, AI-drafted responses, and reputation tracking.
+        This module is under development.
+      </p>
+    </div>
+  </div>
+);
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -64,6 +77,7 @@ function App() {
         <button
             onClick={() => setIsAIOpen(true)}
             className="fixed bottom-24 right-8 p-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-full shadow-lg hover:scale-105 hover:text-white hover:border-gray-600 transition-all z-40 group"
+            aria-label="Open AI Copilot"
         >
             <Bot size={20} className="group-hover:rotate-12 transition-transform" />
             <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-white/10">

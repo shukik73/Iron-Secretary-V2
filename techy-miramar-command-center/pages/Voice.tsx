@@ -1,54 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Clock, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { matchCommand, getResponse, QUICK_COMMANDS } from '../lib/voiceCommands';
 
-// ── Voice Command Types ─────────────────────────────────────────────────
-
-interface VoiceCommand {
-  type: string;
-  patterns: string[];
-  description: string;
-}
-
-const VOICE_COMMANDS: VoiceCommand[] = [
-  { type: 'add_lead', patterns: ['add a lead', 'new lead', 'add lead', 'new walk-in', 'add customer', 'new customer'], description: 'Add a new lead/customer' },
-  { type: 'check_repairs', patterns: ['what repairs are pending', 'pending repairs', "what's in the shop", 'how many repairs', 'active tickets', 'what needs attention'], description: 'Check active repairs' },
-  { type: 'schedule_pickup', patterns: ['schedule pickup', 'ready for pickup', 'mark as done', 'repair done', 'finished repair'], description: 'Mark repair as complete' },
-  { type: 'check_midas', patterns: ['check midas', 'midas alerts', 'any deals', 'any midas', 'check deals', "what's on midas"], description: 'Check Midas deal alerts' },
-  { type: 'emilio_stats', patterns: ['emilio stats', 'how many emails', 'email stats', 'cold email update', 'emilio update'], description: 'Get Emilio email stats' },
-  { type: 'check_revenue', patterns: ['revenue this month', 'show revenue', 'how much money', 'monthly revenue', 'how are we doing'], description: 'Check monthly revenue' },
-  { type: 'check_reviews', patterns: ['pending reviews', 'any reviews', 'review guard', 'reviews waiting'], description: 'Check pending reviews' },
-  { type: 'queue_task', patterns: ['queue a claude task', 'add night task', 'claude assignment', 'overnight task', 'queue task'], description: 'Queue a Night Shift task' },
-  { type: 'read_alerts', patterns: ['read alerts', 'critical alerts', "what's urgent", 'any alerts', "today's alerts"], description: 'Read critical alerts' },
-];
-
-// ── Mock Responses ──────────────────────────────────────────────────────
-
-const MOCK_RESPONSES: Record<string, string> = {
-  add_lead: 'Lead #248 created for Maria — Samsung Galaxy S24 — Won\'t charge. Telegram alert sent.',
-  check_repairs: '4 active repairs. 1 urgent: John D\'s iPhone 14 has been in diagnosing for 52 hours.',
-  schedule_pickup: 'Marked MacBook Pro for Sarah as done. Pickup notification will send automatically.',
-  check_midas: '1 hot deal: MacBook Pro 15" 2015 on eBay for $95 — estimated margin $215. Buy rules pass.',
-  emilio_stats: '247 sent this week. 34% open rate, 4.2% reply rate. 3 demos booked.',
-  check_revenue: '$13,200 this month — 101% of $13,000 target. Repair: $10,400. Refurb: $2,800.',
-  check_reviews: '3 reviews waiting for response approval. 2 positive (5-star), 1 negative (2-star).',
-  queue_task: 'What type of task? Code, content, research, or audit? Say the type to continue.',
-  read_alerts: '2 alerts. Critical: John D ticket stalled over 48 hours. Warning: ReviewGuard demo in 15 minutes.',
-};
-
-// ── Quick Commands ──────────────────────────────────────────────────────
-
-const QUICK_COMMANDS = [
-  { label: 'Add a new lead', command: 'add a new lead' },
-  { label: 'What repairs are pending?', command: 'what repairs are pending' },
-  { label: 'Check Midas alerts', command: 'check midas alerts' },
-  { label: 'How many emails sent today?', command: 'how many emails sent today' },
-  { label: 'Schedule a pickup', command: 'schedule a pickup' },
-  { label: 'Show revenue this month', command: 'show revenue this month' },
-  { label: 'Queue a Claude task', command: 'queue a claude task' },
-  { label: "Read me today's critical alerts", command: 'read me today\'s critical alerts' },
-];
-
-// ── Mock Voice Logs ─────────────────────────────────────────────────────
+// ── Voice Log Type ──────────────────────────────────────────────────────
 
 interface VoiceLog {
   id: string;
@@ -82,26 +36,6 @@ const mockLogs: VoiceLog[] = [
   },
 ];
 
-// ── Command Matcher ─────────────────────────────────────────────────────
-
-function matchCommand(transcript: string): { type: string; confidence: number } | null {
-  const lower = transcript.toLowerCase().trim();
-  let bestMatch: { type: string; confidence: number } | null = null;
-
-  for (const cmd of VOICE_COMMANDS) {
-    for (const pattern of cmd.patterns) {
-      if (lower.includes(pattern)) {
-        const confidence = pattern.length / lower.length;
-        if (!bestMatch || confidence > bestMatch.confidence) {
-          bestMatch = { type: cmd.type, confidence: Math.min(confidence, 1) };
-        }
-      }
-    }
-  }
-
-  return bestMatch;
-}
-
 // ── Main Component ──────────────────────────────────────────────────────
 
 const Voice: React.FC = () => {
@@ -110,79 +44,17 @@ const Voice: React.FC = () => {
   const [response, setResponse] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<VoiceLog[]>(mockLogs);
-  const recognitionRef = useRef<any>(null);
-
-  // Web Speech API setup
-  const startListening = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setResponse('Speech recognition is not supported in this browser. Try Chrome.');
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
-        }
-      }
-      setTranscript(finalTranscript || interimTranscript);
-      if (finalTranscript) {
-        processCommand(finalTranscript);
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
-      setIsListening(false);
-      setResponse(`Error: ${event.error}. Please try again.`);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
-    setTranscript('');
-    setResponse('');
-  }, []);
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsListening(false);
-  }, []);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const processCommand = useCallback((text: string) => {
     setIsProcessing(true);
     const match = matchCommand(text);
 
-    // Simulate processing delay
     setTimeout(() => {
-      let responseText: string;
-      if (match) {
-        responseText = MOCK_RESPONSES[match.type] || 'Command recognized but no handler available yet.';
-      } else {
-        responseText = `I heard: "${text}". I'm not sure what action to take. Try one of the quick commands below, or rephrase your request.`;
-      }
-
+      const responseText = getResponse(match?.type ?? null, text);
       setResponse(responseText);
       setIsProcessing(false);
 
-      // Add to logs
       setLogs(prev => [{
         id: `vl-${Date.now()}`,
         transcript: text,
@@ -191,7 +63,6 @@ const Voice: React.FC = () => {
         created_at: new Date().toISOString(),
       }, ...prev]);
 
-      // TTS playback (browser-native)
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(responseText);
         utterance.rate = 1.0;
@@ -199,6 +70,63 @@ const Voice: React.FC = () => {
         window.speechSynthesis.speak(utterance);
       }
     }, 600);
+  }, []);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      setResponse('Speech recognition is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+        setTranscript(finalTranscript || interimTranscript);
+        if (finalTranscript) {
+          processCommand(finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        setResponse(`Error: ${event.error}. Please try again.`);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsListening(true);
+      setTranscript('');
+      setResponse('');
+    } catch {
+      setResponse('Could not start speech recognition. Check microphone permissions.');
+    }
+  }, [processCommand]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
   }, []);
 
   const handleQuickCommand = useCallback((command: string) => {
@@ -226,7 +154,7 @@ const Voice: React.FC = () => {
           <Mic className="w-9 h-9 text-purple-400" />
           Voice Assistant
         </h1>
-        <p className="text-gray-400">Hands-free command center</p>
+        <p className="text-gray-400">Hands-free command center. <span className="text-gray-500 text-sm">Works best in Chrome and Edge.</span></p>
       </div>
 
       {/* Main Voice Area */}
@@ -234,13 +162,13 @@ const Voice: React.FC = () => {
         {/* Mic Button */}
         <button
           onClick={isListening ? stopListening : startListening}
+          aria-label={isListening ? 'Stop listening' : 'Start listening'}
           className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all duration-300 ${
             isListening
               ? 'bg-gradient-to-r from-purple-600 to-indigo-600 shadow-[0_0_60px_rgba(147,51,234,0.5)] scale-110'
               : 'bg-gradient-to-r from-indigo-600 to-purple-600 shadow-[0_0_30px_rgba(147,51,234,0.2)] hover:scale-105'
           }`}
         >
-          {/* Pulse rings when listening */}
           {isListening && (
             <>
               <span className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping" />
@@ -304,34 +232,41 @@ const Voice: React.FC = () => {
       {/* Recent Voice Logs */}
       <section>
         <h2 className="text-xl font-semibold text-white mb-4">Recent Voice Logs</h2>
-        <div className="glass-card rounded-2xl overflow-hidden">
-          {logs.slice(0, 10).map((log, idx) => (
-            <div
-              key={log.id}
-              className={`px-6 py-4 hover:bg-white/5 transition-colors ${
-                idx < Math.min(logs.length, 10) - 1 ? 'border-b border-white/5' : ''
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="text-xs text-gray-500 w-20 flex-shrink-0 pt-0.5 font-mono">
-                  {new Date(log.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                </span>
-                <div className="flex-1">
-                  <p className="text-sm text-white">"{log.transcript}"</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-gray-500">&rarr;</span>
-                    <p className="text-sm text-gray-400">{log.response}</p>
-                    {log.success ? (
-                      <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
-                    ) : (
-                      <AlertCircle size={14} className="text-amber-400 flex-shrink-0" />
-                    )}
+        {logs.length === 0 ? (
+          <div className="glass-card rounded-2xl p-8 text-center">
+            <Mic size={24} className="text-gray-600 mx-auto mb-2" />
+            <p className="text-sm text-gray-500">No voice logs yet. Try a command above.</p>
+          </div>
+        ) : (
+          <div className="glass-card rounded-2xl overflow-hidden">
+            {logs.slice(0, 10).map((log, idx) => (
+              <div
+                key={log.id}
+                className={`px-6 py-4 hover:bg-white/5 transition-colors ${
+                  idx < Math.min(logs.length, 10) - 1 ? 'border-b border-white/5' : ''
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-xs text-gray-500 w-20 flex-shrink-0 pt-0.5 font-mono">
+                    {new Date(log.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">"{log.transcript}"</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-gray-500">&rarr;</span>
+                      <p className="text-sm text-gray-400 truncate">{log.response}</p>
+                      {log.success ? (
+                        <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
+                      ) : (
+                        <AlertCircle size={14} className="text-amber-400 flex-shrink-0" />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

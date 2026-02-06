@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bot,
   User,
@@ -53,7 +53,7 @@ const QUICK_TEMPLATES = [
 
 // ── Mock Data ───────────────────────────────────────────────────────────
 
-const mockMyTasks: WorkspaceTask[] = [
+const initialMyTasks: WorkspaceTask[] = [
   {
     id: 'wt-1',
     title: "Reply to Mike's Phone Fix email",
@@ -101,7 +101,7 @@ const mockMyTasks: WorkspaceTask[] = [
   },
 ];
 
-const mockAITasks: WorkspaceTask[] = [
+const initialAITasks: WorkspaceTask[] = [
   {
     id: 'wt-ai-1',
     title: 'Drafting blog post: "MacBook Battery Cost in 2025"',
@@ -119,7 +119,7 @@ const mockAITasks: WorkspaceTask[] = [
   },
 ];
 
-const mockDoneTasks: WorkspaceTask[] = [
+const initialDoneTasks: WorkspaceTask[] = [
   {
     id: 'wt-d1',
     title: 'Research competitor pricing',
@@ -242,23 +242,76 @@ const TaskCard: React.FC<{ task: WorkspaceTask }> = ({ task }) => (
 interface NewTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAddTask: (task: WorkspaceTask) => void;
 }
 
-const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
+const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose, onAddTask }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [assignedTo, setAssignedTo] = useState<'you' | 'ai'>('ai');
   const [priority, setPriority] = useState<'medium' | 'critical' | 'high' | 'low'>('medium');
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // Close on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
+  const isTitleEmpty = title.trim().length === 0;
+
+  const handleCreate = () => {
+    if (isTitleEmpty) return;
+    const newTask: WorkspaceTask = {
+      id: `wt-${Date.now()}`,
+      title: title.trim(),
+      description: description.trim(),
+      assigned_to: assignedTo,
+      priority,
+      status: assignedTo === 'ai' ? 'in_progress' : 'pending',
+      task_type: 'custom',
+      output_text: null,
+      output_path: null,
+      due_date: null,
+      started_at: assignedTo === 'ai' ? new Date().toISOString() : null,
+      completed_at: null,
+      created_at: new Date().toISOString(),
+    };
+    onAddTask(newTask);
+    setTitle('');
+    setDescription('');
+    setAssignedTo('ai');
+    setPriority('medium');
+    setShowTemplates(false);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-lg p-6">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="glass-panel rounded-2xl w-full max-w-lg p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-white">Add Shared Task</h2>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
+            aria-label="Close dialog"
+          >
             <X size={20} />
           </button>
         </div>
@@ -268,6 +321,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
           <button
             onClick={() => setShowTemplates(!showTemplates)}
             className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1 mb-2"
+            aria-label="Toggle quick templates"
           >
             <ChevronDown size={12} className={`transition-transform ${showTemplates ? 'rotate-180' : ''}`} />
             Quick templates
@@ -320,6 +374,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
             className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
             placeholder="What needs to be done?"
           />
@@ -331,6 +386,7 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            maxLength={2000}
             rows={3}
             className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 resize-y"
             placeholder="Add details, context, or instructions..."
@@ -361,8 +417,9 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
             Cancel
           </button>
           <button
-            onClick={onClose}
-            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            onClick={handleCreate}
+            disabled={isTitleEmpty}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
           >
             Create Task
           </button>
@@ -376,11 +433,22 @@ const NewTaskModal: React.FC<NewTaskModalProps> = ({ isOpen, onClose }) => {
 
 const AIWorkspace: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [myTasks, setMyTasks] = useState<WorkspaceTask[]>(initialMyTasks);
+  const [aiTasks, setAiTasks] = useState<WorkspaceTask[]>(initialAITasks);
+  const [doneTasks, setDoneTasks] = useState<WorkspaceTask[]>(initialDoneTasks);
 
-  const pendingCount = mockMyTasks.filter(t => t.status === 'pending').length + mockAITasks.filter(t => t.status === 'pending').length;
-  const inProgressCount = mockAITasks.filter(t => t.status === 'in_progress').length + mockMyTasks.filter(t => t.status === 'in_progress').length;
-  const doneCount = mockDoneTasks.length;
-  const failedCount = 0;
+  const handleAddTask = (task: WorkspaceTask) => {
+    if (task.assigned_to === 'you') {
+      setMyTasks((prev) => [...prev, task]);
+    } else {
+      setAiTasks((prev) => [...prev, task]);
+    }
+  };
+
+  const pendingCount = myTasks.filter(t => t.status === 'pending').length + aiTasks.filter(t => t.status === 'pending').length;
+  const inProgressCount = aiTasks.filter(t => t.status === 'in_progress').length + myTasks.filter(t => t.status === 'in_progress').length;
+  const doneCount = doneTasks.length;
+  const failedCount = [...myTasks, ...aiTasks, ...doneTasks].filter(t => t.status === 'failed').length;
 
   return (
     <div className="space-y-8 animate-fade-in pb-10">
@@ -396,6 +464,7 @@ const AIWorkspace: React.FC = () => {
         <button
           onClick={() => setModalOpen(true)}
           className="bg-white text-black px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors flex items-center shadow-[0_0_15px_rgba(255,255,255,0.1)] mt-4 md:mt-0"
+          aria-label="Add a shared task"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add a shared task
@@ -441,12 +510,24 @@ const AIWorkspace: React.FC = () => {
           <div className="flex items-center gap-2 mb-4">
             <User size={18} className="text-gray-400" />
             <h2 className="text-lg font-semibold text-white">My Tasks</h2>
-            <span className="text-sm text-gray-500 ml-1">{mockMyTasks.length}</span>
+            <span className="text-sm text-gray-500 ml-1">{myTasks.length}</span>
           </div>
           <div className="space-y-3">
-            {mockMyTasks.map((task) => (
+            {myTasks.map((task) => (
               <TaskCard key={task.id} task={task} />
             ))}
+            {myTasks.length === 0 && (
+              <div className="glass-card rounded-xl p-6 border border-dashed border-white/10 text-center">
+                <User size={24} className="text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No tasks assigned to you</p>
+                <button
+                  onClick={() => setModalOpen(true)}
+                  className="text-xs text-blue-400 hover:text-blue-300 mt-2"
+                >
+                  Add a task for yourself
+                </button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -455,13 +536,13 @@ const AIWorkspace: React.FC = () => {
           <div className="flex items-center gap-2 mb-4">
             <Bot size={18} className="text-purple-400" />
             <h2 className="text-lg font-semibold text-white">Claude's Tasks</h2>
-            <span className="text-sm text-gray-500 ml-1">{mockAITasks.length}</span>
+            <span className="text-sm text-gray-500 ml-1">{aiTasks.length}</span>
           </div>
           <div className="space-y-3">
-            {mockAITasks.map((task) => (
+            {aiTasks.map((task) => (
               <TaskCard key={task.id} task={task} />
             ))}
-            {mockAITasks.length === 0 && (
+            {aiTasks.length === 0 && (
               <div className="glass-card rounded-xl p-6 border border-dashed border-white/10 text-center">
                 <Bot size={24} className="text-gray-600 mx-auto mb-2" />
                 <p className="text-sm text-gray-500">No active AI tasks</p>
@@ -478,15 +559,15 @@ const AIWorkspace: React.FC = () => {
       </div>
 
       {/* Done Today */}
-      {mockDoneTasks.length > 0 && (
+      {doneTasks.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle2 size={18} className="text-emerald-400" />
             <h2 className="text-lg font-semibold text-white">Completed Today</h2>
-            <span className="text-sm text-gray-500 ml-1">{mockDoneTasks.length}</span>
+            <span className="text-sm text-gray-500 ml-1">{doneTasks.length}</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {mockDoneTasks.map((task) => (
+            {doneTasks.map((task) => (
               <TaskCard key={task.id} task={task} />
             ))}
           </div>
@@ -519,7 +600,7 @@ const AIWorkspace: React.FC = () => {
       </section>
 
       {/* Modal */}
-      <NewTaskModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
+      <NewTaskModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onAddTask={handleAddTask} />
     </div>
   );
 };

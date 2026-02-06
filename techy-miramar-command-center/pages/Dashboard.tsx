@@ -1,16 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Calendar,
   Clock,
   CheckCircle2,
   ArrowRight,
-  MoreHorizontal,
   Plus,
   Zap,
   Mail,
   TrendingUp,
   AlertCircle,
-  MessageSquare,
   Moon,
   AlertTriangle,
 } from 'lucide-react';
@@ -35,15 +33,25 @@ const dailyCadence = [
 ];
 
 const Dashboard: React.FC = () => {
+  const todayLabel = useMemo(() => {
+    const now = new Date();
+    const day = now.toLocaleDateString('en-US', { weekday: 'long' });
+    const month = now.toLocaleDateString('en-US', { month: 'long' });
+    const date = now.getDate();
+    const hour = now.getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    return { greeting, dateStr: `${day}, ${month} ${date}` };
+  }, []);
+
   return (
     <div className="space-y-8 animate-fade-in pb-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-end border-b border-gray-800/50 pb-6">
         <div>
-          <h1 className="text-4xl font-bold text-white tracking-tight mb-2">Good afternoon, Boss.</h1>
+          <h1 className="text-4xl font-bold text-white tracking-tight mb-2">{todayLabel.greeting}, Boss.</h1>
           <p className="text-gray-400 flex items-center">
             <Calendar className="w-4 h-4 mr-2" />
-            Tuesday, February 24 • Daily Cadence Active.
+            {todayLabel.dateStr} • Daily Cadence Active.
           </p>
         </div>
         <div className="flex space-x-3 mt-4 md:mt-0">
@@ -80,7 +88,7 @@ const Dashboard: React.FC = () => {
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${task.color}`}>
                                 {task.tag}
                             </span>
-                            <button className="ml-4 opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg text-gray-400 transition-all">
+                            <button className="ml-4 opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg text-gray-400 transition-all" aria-label={`Complete: ${task.title}`}>
                                 <CheckCircle2 size={18} />
                             </button>
                         </div>
@@ -126,8 +134,10 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-semibold text-white">Performance Trajectory</h3>
                         <p className="text-sm text-gray-400">Revenue vs Projected</p>
                     </div>
-                    <select className="bg-black/30 border border-white/10 text-xs text-gray-300 rounded-lg px-3 py-1 focus:outline-none">
+                    <select className="bg-black/30 border border-white/10 text-xs text-gray-300 rounded-lg px-3 py-1 focus:outline-none" aria-label="Time period">
                         <option>Last 7 Days</option>
+                        <option>Last 30 Days</option>
+                        <option>Last 90 Days</option>
                     </select>
                 </div>
                 <div className="h-64 w-full">
