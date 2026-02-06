@@ -1,16 +1,18 @@
 import React from 'react';
-import { 
-  LayoutGrid, 
-  Mail, 
-  ShieldCheck, 
-  Zap, 
-  Users, 
-  Layers, 
-  Cpu, 
+import {
+  LayoutGrid,
+  Mail,
+  ShieldCheck,
+  Zap,
+  Users,
+  Layers,
+  Cpu,
   Settings,
   Menu,
   X,
-  Command
+  Command,
+  Bot,
+  Moon,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -25,6 +27,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
       { id: 'plan', label: 'Projects & Tasks', icon: Layers },
+      { id: 'ai-workspace', label: 'AI Workspace', icon: Bot },
+      { id: 'night-shift', label: 'Night Shift', icon: Moon },
     ]},
     { section: 'Operations', items: [
       { id: 'emilio', label: 'Emilio', icon: Mail, badge: '3' },

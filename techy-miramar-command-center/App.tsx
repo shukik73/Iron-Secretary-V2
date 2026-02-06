@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Bot } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import AIAssistant from './components/AIAssistant';
+import VoiceFAB from './components/VoiceFAB';
 import Dashboard from './pages/Dashboard';
 import Emilio from './pages/Emilio';
 import Midas from './pages/Midas';
 import Leads from './pages/Leads';
 import Plan from './pages/Plan';
+import AIWorkspace from './pages/AIWorkspace';
+import NightShift from './pages/NightShift';
+import Voice from './pages/Voice';
 
 // Simple placeholder components for pages not fully detailed in the file list
 const ReviewGuard = () => <div className="p-10 text-center text-gray-500 glass-card rounded-xl m-10">ReviewGuard Module Loading...</div>;
@@ -24,6 +28,9 @@ function App() {
       case 'midas': return <Midas />;
       case 'leads': return <Leads />;
       case 'plan': return <Plan />;
+      case 'ai-workspace': return <AIWorkspace />;
+      case 'night-shift': return <NightShift />;
+      case 'voice': return <Voice />;
       default: return <Dashboard />;
     }
   };
@@ -51,18 +58,22 @@ function App() {
 
       {/* AI Assistant Toggle/Panel */}
       <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
-      
+
+      {/* AI Copilot button (top of FAB stack) */}
       {!isAIOpen && (
-        <button 
+        <button
             onClick={() => setIsAIOpen(true)}
-            className="fixed bottom-8 right-8 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform z-40 group"
+            className="fixed bottom-24 right-8 p-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-full shadow-lg hover:scale-105 hover:text-white hover:border-gray-600 transition-all z-40 group"
         >
-            <Bot size={24} className="group-hover:rotate-12 transition-transform" />
+            <Bot size={20} className="group-hover:rotate-12 transition-transform" />
             <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-white/10">
                 Open Copilot
             </span>
         </button>
       )}
+
+      {/* Voice FAB (primary, bottom-right) */}
+      <VoiceFAB onNavigateToVoice={() => setActiveTab('voice')} />
     </div>
   );
 }
