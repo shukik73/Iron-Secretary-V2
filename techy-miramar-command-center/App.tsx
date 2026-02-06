@@ -59,11 +59,12 @@ function App() {
       {/* AI Assistant Toggle/Panel */}
       <AIAssistant isOpen={isAIOpen} onClose={() => setIsAIOpen(false)} />
 
-      {/* AI Copilot button (top of FAB stack) */}
+      {/* AI Copilot button (left of voice FAB) */}
       {!isAIOpen && (
         <button
+            aria-label="Open copilot"
             onClick={() => setIsAIOpen(true)}
-            className="fixed bottom-24 right-8 p-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-full shadow-lg hover:scale-105 hover:text-white hover:border-gray-600 transition-all z-40 group"
+            className="fixed bottom-8 right-20 p-3 bg-gray-800 border border-gray-700 text-gray-300 rounded-full shadow-lg hover:scale-105 hover:text-white hover:border-gray-600 transition-all z-40 group"
         >
             <Bot size={20} className="group-hover:rotate-12 transition-transform" />
             <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-white/10">

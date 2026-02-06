@@ -41,7 +41,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
   return (
     <>
       <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button 
+        <button
+          aria-label="Toggle navigation menu"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className="p-2 glass-panel rounded-lg text-white shadow-lg"
         >

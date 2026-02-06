@@ -1,43 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Mic, MicOff, X, ExternalLink, CheckCircle2, Loader } from 'lucide-react';
-
-// ── Command matching (shared logic) ─────────────────────────────────────
-
-const VOICE_PATTERNS: { type: string; patterns: string[] }[] = [
-  { type: 'add_lead', patterns: ['add a lead', 'new lead', 'add lead', 'new walk-in', 'add customer', 'new customer'] },
-  { type: 'check_repairs', patterns: ['what repairs are pending', 'pending repairs', "what's in the shop", 'how many repairs', 'active tickets', 'what needs attention'] },
-  { type: 'schedule_pickup', patterns: ['schedule pickup', 'ready for pickup', 'mark as done', 'repair done', 'finished repair'] },
-  { type: 'check_midas', patterns: ['check midas', 'midas alerts', 'any deals', 'any midas', 'check deals', "what's on midas"] },
-  { type: 'emilio_stats', patterns: ['emilio stats', 'how many emails', 'email stats', 'cold email update', 'emilio update'] },
-  { type: 'check_revenue', patterns: ['revenue this month', 'show revenue', 'how much money', 'monthly revenue', 'how are we doing'] },
-  { type: 'check_reviews', patterns: ['pending reviews', 'any reviews', 'review guard', 'reviews waiting'] },
-  { type: 'queue_task', patterns: ['queue a claude task', 'add night task', 'claude assignment', 'overnight task', 'queue task'] },
-  { type: 'read_alerts', patterns: ['read alerts', 'critical alerts', "what's urgent", 'any alerts', "today's alerts"] },
-];
-
-const MOCK_RESPONSES: Record<string, string> = {
-  add_lead: 'Lead #248 created for Maria — Samsung Galaxy S24 — Won\'t charge. Telegram alert sent.',
-  check_repairs: '4 active repairs. 1 urgent: John D\'s iPhone 14 has been in diagnosing for 52 hours.',
-  schedule_pickup: 'Marked MacBook Pro for Sarah as done. Pickup notification will send automatically.',
-  check_midas: '1 hot deal: MacBook Pro 15" 2015 on eBay for $95 — estimated margin $215.',
-  emilio_stats: '247 sent this week. 34% open rate, 4.2% reply rate. 3 demos booked.',
-  check_revenue: '$13,200 this month — 101% of $13,000 target.',
-  check_reviews: '3 reviews waiting for response approval.',
-  queue_task: 'What type of task? Code, content, research, or audit?',
-  read_alerts: '2 alerts. Critical: John D ticket stalled over 48 hours. Warning: ReviewGuard demo in 15 minutes.',
-};
-
-function matchCommand(transcript: string): string | null {
-  const lower = transcript.toLowerCase().trim();
-  for (const cmd of VOICE_PATTERNS) {
-    for (const pattern of cmd.patterns) {
-      if (lower.includes(pattern)) return cmd.type;
-    }
-  }
-  return null;
-}
-
-// ── VoiceFAB Component ──────────────────────────────────────────────────
+import { Mic, MicOff, X, ExternalLink, CheckCircle2, Loader, RotateCcw } from 'lucide-react';
+import { matchCommand, MOCK_RESPONSES } from '../lib/voiceCommands';
 
 interface VoiceFABProps {
   onNavigateToVoice?: () => void;
@@ -50,64 +13,20 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   const [state, setState] = useState<ModalState>('idle');
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const stateRef = useRef(state);
+  const transcriptRef = useRef(transcript);
 
-  const startListening = useCallback(() => {
-    setModalOpen(true);
-    setState('listening');
-    setTranscript('');
-    setResponse('');
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setState('error');
-      setResponse('Speech recognition is not supported in this browser.');
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-
-    recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript;
-        } else {
-          interimTranscript += result[0].transcript;
-        }
-      }
-      setTranscript(finalTranscript || interimTranscript);
-
-      if (finalTranscript) {
-        processCommand(finalTranscript);
-      }
-    };
-
-    recognition.onerror = (event: any) => {
-      setState('error');
-      setResponse(`Error: ${event.error}`);
-    };
-
-    recognition.onend = () => {
-      if (state === 'listening' && !transcript) {
-        setState('idle');
-      }
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, []);
+  // Keep refs in sync to avoid stale closures in speech callbacks
+  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
   const processCommand = useCallback((text: string) => {
     setState('processing');
-    const matched = matchCommand(text);
+    const match = matchCommand(text);
 
     setTimeout(() => {
+      const matched = match?.type;
       if (matched) {
         setResponse(MOCK_RESPONSES[matched] || 'Command recognized.');
         setState('done');
@@ -116,16 +35,72 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
         setState('done');
       }
 
-      // TTS
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(
-          matched ? MOCK_RESPONSES[matched] || 'Done.' : 'I\'m not sure what to do.'
+          matched ? MOCK_RESPONSES[matched] || 'Done.' : "I'm not sure what to do."
         );
         utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
       }
     }, 500);
   }, []);
+
+  const startListening = useCallback(() => {
+    setModalOpen(true);
+    setState('listening');
+    setTranscript('');
+    setResponse('');
+
+    const SpeechRecognitionApi = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionApi) {
+      setState('error');
+      setResponse('Speech recognition is not supported in this browser. Try Chrome.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionApi();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
+        }
+        setTranscript(finalTranscript || interimTranscript);
+
+        if (finalTranscript) {
+          processCommand(finalTranscript);
+        }
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        setState('error');
+        setResponse(`Error: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        // Use refs to get current values (avoids stale closure)
+        if (stateRef.current === 'listening' && !transcriptRef.current) {
+          setState('idle');
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      setState('error');
+      setResponse('Failed to start speech recognition. Check microphone permissions.');
+    }
+  }, [processCommand]);
 
   const handleClose = () => {
     if (recognitionRef.current) {
@@ -149,6 +124,16 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
     setResponse('');
   };
 
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!modalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [modalOpen]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -162,6 +147,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       {/* FAB Button */}
       <button
         onClick={startListening}
+        aria-label="Voice Command"
         className="fixed bottom-8 right-8 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform z-40 group"
         title="Voice Assistant"
       >
@@ -173,11 +159,18 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
 
       {/* Modal Overlay */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center relative">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          onClick={handleClose}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Voice Assistant"
+        >
+          <div className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center relative" onClick={(e) => e.stopPropagation()}>
             {/* Close button */}
             <button
               onClick={handleClose}
+              aria-label="Close voice assistant"
               className="absolute top-4 right-4 p-1 text-gray-500 hover:text-white transition-colors"
             >
               <X size={18} />
@@ -194,7 +187,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 </div>
                 <p className="text-white font-semibold mb-2">Listening...</p>
                 {transcript && (
-                  <p className="text-gray-300 text-sm mb-4">"{transcript}"</p>
+                  <p className="text-gray-300 text-sm mb-4">&quot;{transcript}&quot;</p>
                 )}
                 <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden mb-4">
                   <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" style={{ width: '60%' }} />
@@ -213,7 +206,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
               <>
                 <Loader size={32} className="text-purple-400 mx-auto mb-4 animate-spin" />
                 <p className="text-white font-semibold mb-2">Processing...</p>
-                <p className="text-gray-400 text-sm">"{transcript}"</p>
+                <p className="text-gray-400 text-sm">&quot;{transcript}&quot;</p>
               </>
             )}
 
@@ -224,6 +217,12 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 <p className="text-white font-semibold mb-3">Done</p>
                 <p className="text-gray-300 text-sm mb-6">{response}</p>
                 <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={startListening}
+                    className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} /> Try Again
+                  </button>
                   {onNavigateToVoice && (
                     <button
                       onClick={() => {
@@ -251,12 +250,20 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 <X size={32} className="text-rose-400 mx-auto mb-4" />
                 <p className="text-white font-semibold mb-2">Error</p>
                 <p className="text-gray-400 text-sm mb-4">{response}</p>
-                <button
-                  onClick={handleClose}
-                  className="text-xs bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-lg transition-colors"
-                >
-                  Close
-                </button>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={startListening}
+                    className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
+                  >
+                    <RotateCcw size={12} /> Try Again
+                  </button>
+                  <button
+                    onClick={handleClose}
+                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-lg transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
               </>
             )}
           </div>
