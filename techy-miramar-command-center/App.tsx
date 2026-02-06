@@ -20,9 +20,7 @@ import Customer360 from './pages/Customer360';
 import WeeklyReview from './pages/WeeklyReview';
 import SmartToday from './pages/SmartToday';
 import TimelineCalendar from './pages/TimelineCalendar';
-
-// Simple placeholder components for pages not fully detailed in the file list
-const ReviewGuard = () => <div className="p-10 text-center text-gray-500 glass-card rounded-xl m-10">ReviewGuard Module Loading...</div>;
+import ReviewGuard from './pages/ReviewGuard';
 
 function App() {
   const { user, loading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
