@@ -92,7 +92,7 @@ function App() {
         userName={user.user_metadata?.full_name ?? ''}
       />
 
-      <main className="flex-1 overflow-y-auto h-full w-full relative bg-[#030712]">
+      <main className="flex-1 overflow-y-auto h-full w-full relative bg-[#030712] main-bg">
         {/* Background Gradients */}
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
              <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-purple-900/20 rounded-full blur-[120px]"></div>

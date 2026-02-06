@@ -1,7 +1,8 @@
-import React from 'react';
-import { ShoppingCart, AlertTriangle, CheckCircle2, ExternalLink, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, AlertTriangle, CheckCircle2, ExternalLink, Zap, Camera, Search } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { MIDAS_BUY_RULES } from '../constants';
+import CameraOCR from '../components/CameraOCR';
 
 const alerts = [
   {
@@ -27,6 +28,13 @@ const alerts = [
 ];
 
 const Midas: React.FC = () => {
+  const [showCamera, setShowCamera] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
+
+  const handleOCRResult = (text: string) => {
+    setOcrResult(text);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
@@ -37,10 +45,50 @@ const Midas: React.FC = () => {
             </h1>
             <p className="text-gray-400 mt-1">Parts Arbitrage & Harvesting Engine</p>
         </div>
-        <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCamera(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+            aria-label="Scan item with camera"
+          >
+            <Camera size={16} /> Scan Item
+          </button>
+          <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
             Log Purchase
-        </button>
+          </button>
+        </div>
       </div>
+
+      {/* OCR Result Banner */}
+      {ocrResult && (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Search size={14} className="text-purple-400" />
+                <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold">Scanned Device Info</p>
+              </div>
+              <p className="text-sm text-gray-200 whitespace-pre-wrap">{ocrResult}</p>
+            </div>
+            <button
+              onClick={() => setOcrResult('')}
+              className="text-gray-500 hover:text-white transition-colors text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Camera OCR Modal */}
+      {showCamera && (
+        <CameraOCR
+          title="Scan Device for Midas"
+          hint="Point at the device label, serial number, or model info"
+          onResult={handleOCRResult}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

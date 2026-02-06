@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Mic, MicOff, X, ExternalLink, CheckCircle2, Loader, RotateCcw } from 'lucide-react';
-import { matchCommand, MOCK_RESPONSES } from '../lib/voiceCommands';
+import { Mic, MicOff, X, ExternalLink, CheckCircle2, Loader, RotateCcw, Sparkles } from 'lucide-react';
+import { sendChatMessage, ChatMessage } from '../lib/aiChat';
 
 interface VoiceFABProps {
   onNavigateToVoice?: () => void;
@@ -13,6 +13,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   const [state, setState] = useState<ModalState>('idle');
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
+  const [conversationHistory, setConversationHistory] = useState<ChatMessage[]>([]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const stateRef = useRef(state);
   const transcriptRef = useRef(transcript);
@@ -21,35 +22,49 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
-  const processCommand = useCallback((text: string) => {
+  const processCommand = useCallback(async (text: string) => {
     setState('processing');
-    const match = matchCommand(text);
 
-    setTimeout(() => {
-      const matched = match?.type;
-      if (matched) {
-        setResponse(MOCK_RESPONSES[matched] || 'Command recognized.');
-        setState('done');
-      } else {
-        setResponse(`I heard: "${text}" but I'm not sure what to do. Try the Voice page for more options.`);
-        setState('done');
-      }
+    // Build conversation with the new user message
+    const newMessages: ChatMessage[] = [
+      ...conversationHistory,
+      { role: 'user', content: text },
+    ];
 
+    try {
+      const aiResponse = await sendChatMessage(newMessages);
+      setResponse(aiResponse);
+      setState('done');
+
+      // Update conversation history (keep last 10 exchanges)
+      setConversationHistory(prev => [
+        ...prev,
+        { role: 'user', content: text },
+        { role: 'assistant', content: aiResponse },
+      ].slice(-20));
+
+      // Speak the response
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(
-          matched ? MOCK_RESPONSES[matched] || 'Done.' : "I'm not sure what to do."
-        );
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(aiResponse);
         utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
       }
-    }, 500);
-  }, []);
+    } catch {
+      setState('error');
+      setResponse('Failed to get AI response. Please try again.');
+    }
+  }, [conversationHistory]);
 
   const startListening = useCallback(() => {
     setModalOpen(true);
     setState('listening');
     setTranscript('');
     setResponse('');
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
 
     const SpeechRecognitionApi = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionApi) {
@@ -88,7 +103,6 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       };
 
       recognition.onend = () => {
-        // Use refs to get current values (avoids stale closure)
         if (stateRef.current === 'listening' && !transcriptRef.current) {
           setState('idle');
         }
@@ -96,19 +110,15 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
 
       recognitionRef.current = recognition;
       recognition.start();
-    } catch (err) {
+    } catch {
       setState('error');
       setResponse('Failed to start speech recognition. Check microphone permissions.');
     }
   }, [processCommand]);
 
   const handleClose = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    if (recognitionRef.current) recognitionRef.current.stop();
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
     setModalOpen(false);
     setState('idle');
     setTranscript('');
@@ -116,15 +126,13 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   };
 
   const handleCancel = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
+    if (recognitionRef.current) recognitionRef.current.stop();
     setState('idle');
     setTranscript('');
     setResponse('');
   };
 
-  // Close modal on Escape key
+  // Close on Escape
   useEffect(() => {
     if (!modalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,7 +161,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       >
         <Mic size={24} className="group-hover:scale-110 transition-transform" />
         <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-white/10">
-          Voice Command
+          Voice Assistant
         </span>
       </button>
 
@@ -175,6 +183,23 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
             >
               <X size={18} />
             </button>
+
+            {/* Idle state */}
+            {state === 'idle' && (
+              <>
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-center opacity-60">
+                  <Mic size={32} className="text-white" />
+                </div>
+                <p className="text-white font-semibold mb-2">Ready to listen</p>
+                <p className="text-gray-400 text-sm mb-4">Tap below or speak a command</p>
+                <button
+                  onClick={startListening}
+                  className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl text-sm font-medium hover:opacity-90 transition-opacity"
+                >
+                  Start Listening
+                </button>
+              </>
+            )}
 
             {/* Listening state */}
             {state === 'listening' && (
@@ -204,8 +229,11 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
             {/* Processing state */}
             {state === 'processing' && (
               <>
-                <Loader size={32} className="text-purple-400 mx-auto mb-4 animate-spin" />
-                <p className="text-white font-semibold mb-2">Processing...</p>
+                <div className="relative w-20 h-20 mx-auto mb-4">
+                  <Loader size={32} className="text-purple-400 mx-auto animate-spin" />
+                  <Sparkles size={16} className="text-indigo-400 absolute top-0 right-2 animate-pulse" />
+                </div>
+                <p className="text-white font-semibold mb-2">Thinking...</p>
                 <p className="text-gray-400 text-sm">&quot;{transcript}&quot;</p>
               </>
             )}
@@ -214,14 +242,14 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
             {state === 'done' && (
               <>
                 <CheckCircle2 size={32} className="text-emerald-400 mx-auto mb-4" />
-                <p className="text-white font-semibold mb-3">Done</p>
-                <p className="text-gray-300 text-sm mb-6">{response}</p>
+                <p className="text-white font-semibold mb-3">Iron Secretary</p>
+                <p className="text-gray-300 text-sm mb-6 text-left">{response}</p>
                 <div className="flex gap-3 justify-center">
                   <button
                     onClick={startListening}
                     className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
                   >
-                    <RotateCcw size={12} /> Try Again
+                    <Mic size={12} /> Continue
                   </button>
                   {onNavigateToVoice && (
                     <button
@@ -231,7 +259,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                       }}
                       className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
                     >
-                      <ExternalLink size={12} /> View Details
+                      <ExternalLink size={12} /> Full View
                     </button>
                   )}
                   <button
@@ -265,6 +293,15 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                   </button>
                 </div>
               </>
+            )}
+
+            {/* Conversation indicator */}
+            {conversationHistory.length > 0 && state !== 'idle' && (
+              <div className="mt-4 pt-3 border-t border-white/5">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+                  Conversation: {Math.floor(conversationHistory.length / 2)} exchanges
+                </p>
+              </div>
             )}
           </div>
         </div>

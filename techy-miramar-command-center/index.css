@@ -17,11 +17,24 @@
 
 /* ── Base Styles ───────────────────────────────────────────── */
 body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ── Dark Theme (default) ─────────────────────────────────── */
+.dark body,
+:root:not(.light) body {
   background-color: #030712;
   background-image: radial-gradient(circle at 50% 0%, #111827 0%, #030712 100%);
   color: #f3f4f6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Light Theme ──────────────────────────────────────────── */
+.light body {
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f8fafc 100%);
+  color: #1e293b;
 }
 
 /* ── Glassmorphism ─────────────────────────────────────────── */
@@ -47,14 +60,47 @@ body {
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 }
 
+/* ── Light Mode Glass Overrides ───────────────────────────── */
+.light .glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.light .glass-card:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+}
+
+/* Light mode structural overrides — uses main-bg class to avoid CSS selector issues */
+.light .main-bg { background-color: #f8fafc; }
+.light .sidebar-bg { background: rgba(255, 255, 255, 0.85); }
+.light .bg-gray-900 { background-color: #ffffff; }
+.light .bg-gray-900\/50 { background-color: rgba(255, 255, 255, 0.5); }
+.light .bg-gray-800 { background-color: #f1f5f9; }
+.light .bg-gray-800\/50 { background-color: rgba(241, 245, 249, 0.5); }
+.light .border-gray-800 { border-color: #e2e8f0; }
+.light .border-gray-800\/50 { border-color: rgba(226, 232, 240, 0.5); }
+.light .border-gray-700\/50 { border-color: rgba(203, 213, 225, 0.5); }
+.light .border-white\/5 { border-color: rgba(0, 0, 0, 0.06); }
+.light .border-white\/10 { border-color: rgba(0, 0, 0, 0.08); }
+.light .text-white { color: #1e293b; }
+.light .text-gray-200 { color: #334155; }
+.light .text-gray-300 { color: #475569; }
+.light .text-gray-400 { color: #64748b; }
+.light .text-gray-500 { color: #94a3b8; }
+
 /* Fallback for devices without backdrop-filter support */
 @supports not (backdrop-filter: blur(8px)) {
-  .glass-panel {
-    background: rgba(17, 24, 39, 0.95);
-  }
-  .glass-card {
-    background: rgba(31, 41, 55, 0.9);
-  }
+  .glass-panel { background: rgba(17, 24, 39, 0.95); }
+  .glass-card { background: rgba(31, 41, 55, 0.9); }
+  .light .glass-panel { background: rgba(255, 255, 255, 0.97); }
+  .light .glass-card { background: rgba(255, 255, 255, 0.95); }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
@@ -71,6 +117,12 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #4b5563;
+}
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* ── Animation ─────────────────────────────────────────────── */
