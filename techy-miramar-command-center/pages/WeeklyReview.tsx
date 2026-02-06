@@ -631,7 +631,7 @@ const WeeklyReview: React.FC = () => {
 
       {/* ─── Footer / Print Hint ─────────────────────────────────── */}
       <div className="text-center text-xs text-gray-700 pt-4">
-        Techy Miramar Command Center &mdash; Weekly Review generated{' '}
+        Iron Secretary V2 &mdash; Weekly Review generated{' '}
         {format(new Date(2026, 1, 6), 'EEEE, MMM d yyyy')}
       </div>
     </div>

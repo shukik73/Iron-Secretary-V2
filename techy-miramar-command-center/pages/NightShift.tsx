@@ -91,7 +91,7 @@ Analyze:
 - Website quality and SEO signals
 - Unique selling propositions
 
-Output: Structured comparison table + actionable insights for Techy Miramar`,
+Output: Structured comparison table + actionable insights for Iron Secretary V2`,
     output_path: '/research/',
     restrictions: '',
     priority: 'medium',

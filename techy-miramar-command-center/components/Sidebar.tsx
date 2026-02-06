@@ -74,8 +74,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
               <Command className="w-5 h-5 text-black" />
             </div>
             <div>
-              <h2 className="font-bold text-white tracking-tight">Techy Miramar</h2>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Command Center</p>
+              <h2 className="font-bold text-white tracking-tight">Iron Secretary</h2>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">V2 — Command Center</p>
             </div>
           </div>
 

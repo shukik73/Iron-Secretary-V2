@@ -45,7 +45,7 @@ const phases = [
   },
   {
     id: 4,
-    name: 'Phase 4: Iron Secretary',
+    name: 'Phase 4: Iron Secretary V2',
     weeks: 'Q3–Q4',
     focus: 'Voice Automation',
     status: 'locked',
