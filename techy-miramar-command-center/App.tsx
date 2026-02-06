@@ -20,9 +20,7 @@ import Customer360 from './pages/Customer360';
 import WeeklyReview from './pages/WeeklyReview';
 import SmartToday from './pages/SmartToday';
 import TimelineCalendar from './pages/TimelineCalendar';
-
-// Simple placeholder components for pages not fully detailed in the file list
-const ReviewGuard = () => <div className="p-10 text-center text-gray-500 glass-card rounded-xl m-10">ReviewGuard Module Loading...</div>;
+import ReviewGuard from './pages/ReviewGuard';
 
 function App() {
   const { user, loading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
@@ -92,7 +90,7 @@ function App() {
         userName={user.user_metadata?.full_name ?? ''}
       />
 
-      <main className="flex-1 overflow-y-auto h-full w-full relative bg-[#030712]">
+      <main className="flex-1 overflow-y-auto h-full w-full relative bg-[#030712] main-bg">
         {/* Background Gradients */}
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
              <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-purple-900/20 rounded-full blur-[120px]"></div>

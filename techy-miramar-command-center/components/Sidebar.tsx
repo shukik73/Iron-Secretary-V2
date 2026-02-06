@@ -13,6 +13,7 @@ import {
   Command,
   Bot,
   Moon,
+  Sun,
   Sunrise,
   Inbox,
   UserCircle,
@@ -21,6 +22,7 @@ import {
   BarChart3,
   LogOut,
 } from 'lucide-react';
+import { useTheme } from '../lib/ThemeContext';
 
 interface SidebarProps {
   activeTab: string;
@@ -33,6 +35,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen, onSignOut, userEmail, userName }) => {
+  const { theme, toggleTheme } = useTheme();
+
   const navItems = [
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
@@ -69,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
       </div>
 
       <aside className={`
-        fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ease-in-out border-r border-gray-800/50 bg-black/40 backdrop-blur-xl w-[260px]
+        fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ease-in-out border-r border-gray-800/50 bg-black/40 backdrop-blur-xl w-[260px] sidebar-bg
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="h-full px-4 py-6 flex flex-col">
@@ -124,6 +128,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
           </div>
 
           <div className="pt-6 border-t border-gray-800/50 space-y-1">
+             <button
+               onClick={toggleTheme}
+               className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium"
+               aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+             >
+                {theme === 'dark' ? <Sun className="w-4 h-4 mr-3" /> : <Moon className="w-4 h-4 mr-3" />}
+                <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+              </button>
              <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium">
                 <Settings className="w-4 h-4 mr-3" />
                 <span>Settings</span>

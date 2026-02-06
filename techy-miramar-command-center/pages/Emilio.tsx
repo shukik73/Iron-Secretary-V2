@@ -1,7 +1,8 @@
-import React from 'react';
-import { Mail, MessageSquare, UserCheck, Trash2, Send } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, MessageSquare, UserCheck, Trash2, Send, Camera, FileText } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import CameraOCR from '../components/CameraOCR';
 
 const funnelData = [
   { name: 'Sent', value: 247, color: '#3b82f6' },
@@ -17,10 +18,57 @@ const recentReplies = [
 ];
 
 const Emilio: React.FC = () => {
+  const [showCamera, setShowCamera] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
+
+  const handleOCRResult = (text: string) => {
+    setOcrResult(text);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold text-white tracking-tight">Emilio Engine</h1>
-      
+      <div className="flex justify-between items-center">
+        <h1 className="text-4xl font-bold text-white tracking-tight">Emilio Engine</h1>
+        <button
+          onClick={() => setShowCamera(true)}
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+          aria-label="Scan email or document with camera"
+        >
+          <Camera size={16} /> Scan Email
+        </button>
+      </div>
+
+      {/* OCR Result Banner */}
+      {ocrResult && (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText size={14} className="text-purple-400" />
+                <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold">Scanned Email Content</p>
+              </div>
+              <p className="text-sm text-gray-200 whitespace-pre-wrap">{ocrResult}</p>
+            </div>
+            <button
+              onClick={() => setOcrResult('')}
+              className="text-gray-500 hover:text-white transition-colors text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Camera OCR Modal */}
+      {showCamera && (
+        <CameraOCR
+          title="Scan Email for Emilio"
+          hint="Point at the email or document you want to capture"
+          onResult={handleOCRResult}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
          <StatCard title="Sent" value="247" icon={Send} color="blue" />

@@ -1,7 +1,8 @@
-import React from 'react';
-import { ShoppingCart, AlertTriangle, CheckCircle, ExternalLink, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, AlertTriangle, CheckCircle2, ExternalLink, Zap, Camera, Search } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { MIDAS_BUY_RULES } from '../constants';
+import CameraOCR from '../components/CameraOCR';
 
 const alerts = [
   {
@@ -27,26 +28,73 @@ const alerts = [
 ];
 
 const Midas: React.FC = () => {
+  const [showCamera, setShowCamera] = useState(false);
+  const [ocrResult, setOcrResult] = useState('');
+
+  const handleOCRResult = (text: string) => {
+    setOcrResult(text);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center">
         <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight flex items-center">
+            <h1 className="text-4xl font-bold text-white tracking-tight flex items-center">
                 <span className="text-amber-500 mr-2">⚡</span>
                 Midas
             </h1>
             <p className="text-gray-400 mt-1">Parts Arbitrage & Harvesting Engine</p>
         </div>
-        <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowCamera(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2"
+            aria-label="Scan item with camera"
+          >
+            <Camera size={16} /> Scan Item
+          </button>
+          <button className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
             Log Purchase
-        </button>
+          </button>
+        </div>
       </div>
+
+      {/* OCR Result Banner */}
+      {ocrResult && (
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <Search size={14} className="text-purple-400" />
+                <p className="text-xs text-purple-400 uppercase tracking-wider font-semibold">Scanned Device Info</p>
+              </div>
+              <p className="text-sm text-gray-200 whitespace-pre-wrap">{ocrResult}</p>
+            </div>
+            <button
+              onClick={() => setOcrResult('')}
+              className="text-gray-500 hover:text-white transition-colors text-xs"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Camera OCR Modal */}
+      {showCamera && (
+        <CameraOCR
+          title="Scan Device for Midas"
+          hint="Point at the device label, serial number, or model info"
+          onResult={handleOCRResult}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
 
       {/* Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard title="Deals Alerted" value="12" icon={Zap} trend="up" color="amber" />
         <StatCard title="Purchased (Mo)" value="2" icon={ShoppingCart} trend="neutral" color="blue" />
-        <StatCard title="Est. Margin" value="$380" icon={CheckCircle} trend="up" color="emerald" />
+        <StatCard title="Est. Margin" value="$380" icon={CheckCircle2} trend="up" color="emerald" />
         <StatCard title="Open Buys" value="2/3" subValue="Limit Reached Soon" icon={AlertTriangle} color="rose" />
       </div>
 
@@ -75,7 +123,7 @@ const Midas: React.FC = () => {
                         <div className="text-sm text-gray-400 mb-1">Proj. Margin</div>
                         <div className="text-2xl font-bold text-emerald-400 mb-3">+${deal.margin}</div>
                         <div className="flex space-x-2">
-                             <a href={deal.url} className="p-2 bg-gray-800 rounded hover:bg-gray-700 text-gray-300 transition-colors">
+                             <a href={deal.url} className="p-2 bg-gray-800 rounded hover:bg-gray-700 text-gray-300 transition-colors" aria-label={`View ${deal.device} listing`}>
                                 <ExternalLink size={18} />
                              </a>
                              <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium transition-colors">
