@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Bot } from 'lucide-react';
+import { Bot, Loader2 } from 'lucide-react';
+import { useAuth } from './lib/AuthContext';
 import Sidebar from './components/Sidebar';
 import AIAssistant from './components/AIAssistant';
 import VoiceFAB from './components/VoiceFAB';
 import QuickCapture from './components/QuickCapture';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Emilio from './pages/Emilio';
 import Midas from './pages/Midas';
@@ -23,6 +25,7 @@ import TimelineCalendar from './pages/TimelineCalendar';
 const ReviewGuard = () => <div className="p-10 text-center text-gray-500 glass-card rounded-xl m-10">ReviewGuard Module Loading...</div>;
 
 function App() {
+  const { user, loading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -30,6 +33,31 @@ function App() {
   const handleCapture = useCallback((text: string, type: string) => {
     console.log(`[QuickCapture] ${type}: ${text}`);
   }, []);
+
+  // Show loading spinner while checking session
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#030712]">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-4" />
+          <p className="text-gray-400 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show login screen if not authenticated
+  if (!user) {
+    return (
+      <Login
+        onAuth={() => {}}
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onResetPassword={resetPassword}
+        onUpdatePassword={updatePassword}
+      />
+    );
+  }
 
   const renderContent = () => {
     switch(activeTab) {
@@ -54,13 +82,16 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         isMobileOpen={isMobileOpen}
         setIsMobileOpen={setIsMobileOpen}
+        onSignOut={signOut}
+        userEmail={user.email ?? ''}
+        userName={user.user_metadata?.full_name ?? ''}
       />
-      
+
       <main className="flex-1 overflow-y-auto h-full w-full relative bg-[#030712]">
         {/* Background Gradients */}
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">

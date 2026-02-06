@@ -19,6 +19,7 @@ import {
   CalendarDays,
   CheckSquare,
   BarChart3,
+  LogOut,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,9 +27,12 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+  onSignOut?: () => void;
+  userEmail?: string;
+  userName?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen, onSignOut, userEmail, userName }) => {
   const navItems = [
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
@@ -119,15 +123,37 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             ))}
           </div>
 
-          <div className="pt-6 border-t border-gray-800/50">
+          <div className="pt-6 border-t border-gray-800/50 space-y-1">
              <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium">
                 <Settings className="w-4 h-4 mr-3" />
                 <span>Settings</span>
               </button>
-             <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium mt-1">
+             <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium">
                 <Cpu className="w-4 h-4 mr-3" />
                 <span>AI Configuration</span>
               </button>
+          </div>
+
+          {/* User Profile & Sign Out */}
+          <div className="pt-4 border-t border-gray-800/50 mt-4">
+            <div className="flex items-center px-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
+                {(userName || userEmail || '?')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                {userName && <p className="text-sm text-white font-medium truncate">{userName}</p>}
+                <p className="text-[11px] text-gray-500 truncate">{userEmail}</p>
+              </div>
+            </div>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-rose-500/10 hover:text-rose-400 transition-all text-sm font-medium mt-1"
+              >
+                <LogOut className="w-4 h-4 mr-3" />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>
