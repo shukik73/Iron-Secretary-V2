@@ -13,6 +13,13 @@ import {
   Command,
   Bot,
   Moon,
+  Sunrise,
+  Inbox,
+  UserCircle,
+  CalendarDays,
+  CheckSquare,
+  BarChart3,
+  LogOut,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -20,12 +27,18 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isMobileOpen: boolean;
   setIsMobileOpen: (open: boolean) => void;
+  onSignOut?: () => void;
+  userEmail?: string;
+  userName?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen, onSignOut, userEmail, userName }) => {
   const navItems = [
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
+      { id: 'morning-briefing', label: 'Morning Briefing', icon: Sunrise },
+      { id: 'smart-today', label: 'Today', icon: CheckSquare },
+      { id: 'timeline', label: 'Schedule', icon: CalendarDays },
       { id: 'plan', label: 'Projects & Tasks', icon: Layers },
       { id: 'ai-workspace', label: 'AI Workspace', icon: Bot },
       { id: 'night-shift', label: 'Night Shift', icon: Moon },
@@ -34,7 +47,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
       { id: 'emilio', label: 'Emilio', icon: Mail, badge: '3' },
       { id: 'midas', label: 'Midas', icon: Zap, badge: '1', badgeColor: 'text-amber-400 bg-amber-400/10' },
       { id: 'leads', label: 'Leads', icon: Users, badge: '2', badgeColor: 'text-rose-400 bg-rose-400/10' },
+      { id: 'customer-360', label: 'Customers', icon: UserCircle },
       { id: 'reviewguard', label: 'ReviewGuard', icon: ShieldCheck },
+    ]},
+    { section: 'Reports', items: [
+      { id: 'inbox', label: 'Inbox', icon: Inbox, badge: '5', badgeColor: 'text-blue-400 bg-blue-400/10' },
+      { id: 'weekly-review', label: 'Weekly Review', icon: BarChart3 },
     ]},
   ];
 
@@ -42,18 +60,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
     <>
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
+          aria-label="Toggle navigation menu"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
           className="p-2 glass-panel rounded-lg text-white shadow-lg"
-          aria-label={isMobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
         >
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
-      <aside
-        role="navigation"
-        aria-label="Main navigation"
-        className={`
+      <aside className={`
         fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ease-in-out border-r border-gray-800/50 bg-black/40 backdrop-blur-xl w-[260px]
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -63,8 +78,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
               <Command className="w-5 h-5 text-black" />
             </div>
             <div>
-              <h2 className="font-bold text-white tracking-tight">Techy Miramar</h2>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Command Center</p>
+              <h2 className="font-bold text-white tracking-tight">Iron Secretary</h2>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">V2 — Command Center</p>
             </div>
           </div>
 
@@ -108,15 +123,37 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             ))}
           </div>
 
-          <div className="pt-6 border-t border-gray-800/50">
+          <div className="pt-6 border-t border-gray-800/50 space-y-1">
              <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium">
                 <Settings className="w-4 h-4 mr-3" />
                 <span>Settings</span>
               </button>
-             <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium mt-1">
+             <button className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-white/5 hover:text-white transition-all text-sm font-medium">
                 <Cpu className="w-4 h-4 mr-3" />
                 <span>AI Configuration</span>
               </button>
+          </div>
+
+          {/* User Profile & Sign Out */}
+          <div className="pt-4 border-t border-gray-800/50 mt-4">
+            <div className="flex items-center px-3 py-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-white text-xs font-bold mr-3 flex-shrink-0">
+                {(userName || userEmail || '?')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                {userName && <p className="text-sm text-white font-medium truncate">{userName}</p>}
+                <p className="text-[11px] text-gray-500 truncate">{userEmail}</p>
+              </div>
+            </div>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="w-full flex items-center px-3 py-2.5 text-gray-400 rounded-lg hover:bg-rose-500/10 hover:text-rose-400 transition-all text-sm font-medium mt-1"
+              >
+                <LogOut className="w-4 h-4 mr-3" />
+                <span>Sign Out</span>
+              </button>
+            )}
           </div>
         </div>
       </aside>

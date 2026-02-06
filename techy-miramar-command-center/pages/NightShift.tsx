@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Moon,
   Plus,
@@ -36,7 +36,7 @@ const NIGHT_SHIFT_TEMPLATES: Record<string, Omit<NightShiftTask, 'id' | 'status'
 - Compare screenshots to last week (flag visual changes)`,
     output_path: '/audits/weekly/YYYY-MM-DD.md',
     restrictions: 'Do NOT modify any live code, push changes, or update dependencies.',
-    priority: 1,
+    priority: 'high',
     scope: '',
     git_branch: '',
   },
@@ -58,7 +58,7 @@ Rules:
 - SEO: use target keyword in title, first paragraph, and 2-3 subheadings`,
     output_path: '/content/blog/drafts/',
     restrictions: 'Do NOT publish directly. Save as drafts for review.',
-    priority: 1,
+    priority: 'high',
     scope: '',
     git_branch: '',
   },
@@ -75,7 +75,7 @@ Response rules:
 - Keep under 3 sentences`,
     output_path: 'reviewguard_reviews.response_draft',
     restrictions: 'Draft only — do NOT send responses. Queue for approval.',
-    priority: 1,
+    priority: 'high',
     scope: '',
     git_branch: '',
   },
@@ -91,10 +91,10 @@ Analyze:
 - Website quality and SEO signals
 - Unique selling propositions
 
-Output: Structured comparison table + actionable insights for Techy Miramar`,
+Output: Structured comparison table + actionable insights for Iron Secretary V2`,
     output_path: '/research/',
     restrictions: '',
-    priority: 2,
+    priority: 'medium',
     scope: '',
     git_branch: '',
   },
@@ -117,7 +117,7 @@ Rules:
 - 600-800 words per page`,
     output_path: '/content/pages/drafts/',
     restrictions: 'Do NOT publish. Save for review.',
-    priority: 2,
+    priority: 'medium',
     scope: '',
     git_branch: '',
   },
@@ -138,7 +138,7 @@ Output:
 - A/B test suggestions for next week`,
     output_path: '/research/emilio-analysis/',
     restrictions: '',
-    priority: 1,
+    priority: 'high',
     scope: '',
     git_branch: '',
   },
@@ -155,7 +155,7 @@ interface NightShiftTask {
   output_path: string;
   git_branch: string;
   restrictions: string;
-  priority: number;
+  priority: 'high' | 'medium' | 'low';
   schedule_date: string;
   status: string;
   started_at: string | null;
@@ -185,7 +185,7 @@ const initialQueue: NightShiftTask[] = [
     output_path: '/content/blog/drafts/',
     git_branch: '',
     restrictions: 'Do NOT publish directly. Save as drafts for review.',
-    priority: 1,
+    priority: 'high',
     schedule_date: '2026-02-06',
     status: 'queued',
     started_at: null,
@@ -211,7 +211,7 @@ const initialQueue: NightShiftTask[] = [
     output_path: '/audits/weekly/2026-02-06.md',
     git_branch: '',
     restrictions: 'Do NOT modify live code, push changes, or update dependencies.',
-    priority: 2,
+    priority: 'medium',
     schedule_date: '2026-02-06',
     status: 'queued',
     started_at: null,
@@ -240,7 +240,7 @@ const mockCompleted: NightShiftTask[] = [
     output_path: '/content/blog/drafts/',
     git_branch: '',
     restrictions: '',
-    priority: 1,
+    priority: 'high',
     schedule_date: '2026-02-05',
     status: 'completed',
     started_at: '2026-02-06T02:13:00Z',
@@ -269,7 +269,7 @@ const mockCompleted: NightShiftTask[] = [
     output_path: '/audits/weekly/2026-02-06.md',
     git_branch: '',
     restrictions: '',
-    priority: 2,
+    priority: 'medium',
     schedule_date: '2026-02-05',
     status: 'completed',
     started_at: '2026-02-06T02:54:00Z',
@@ -298,6 +298,10 @@ const mockHistory = [
   { id: 'h5', date: 'Feb 1', status: 'completed', type: 'Content', title: 'Service area page drafts' },
 ];
 
+// ── Helper: capitalize first letter ─────────────────────────────────────
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 // ── Helper Components ───────────────────────────────────────────────────
 
 const typeConfig: Record<string, { icon: typeof Code; color: string; label: string }> = {
@@ -323,12 +327,12 @@ const TaskTypeIcon: React.FC<{ type: string; size?: 'sm' | 'lg' }> = ({ type, si
 interface AssignmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask: (task: NightShiftTask) => void;
+  onAdd: (task: NightShiftTask) => void;
   initialType?: string;
   initialTemplate?: string;
 }
 
-const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAddTask, initialType, initialTemplate }) => {
+const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAdd, initialType, initialTemplate }) => {
   const template = initialTemplate ? NIGHT_SHIFT_TEMPLATES[initialTemplate] : null;
   const [taskType, setTaskType] = useState(template?.task_type || initialType || 'content');
   const [title, setTitle] = useState(template?.title || '');
@@ -337,53 +341,61 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
   const [scope, setScope] = useState(template?.scope || '');
   const [gitBranch, setGitBranch] = useState(template?.git_branch || '');
   const [restrictions, setRestrictions] = useState(template?.restrictions || '');
-  const [priority, setPriority] = useState(template?.priority || 1);
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>(template?.priority || 'high');
   const [schedule, setSchedule] = useState<'tonight' | 'tomorrow' | 'pick'>('tonight');
 
-  // Fix #2: Reset state when initialTemplate or initialType changes
+  // Fix #2: Reset form state when the modal reopens or props change
   useEffect(() => {
-    const t = initialTemplate ? NIGHT_SHIFT_TEMPLATES[initialTemplate] : null;
-    setTaskType(t?.task_type || initialType || 'content');
-    setTitle(t?.title || '');
-    setPrompt(t?.prompt || '');
-    setOutputPath(t?.output_path || '');
-    setScope(t?.scope || '');
-    setGitBranch(t?.git_branch || '');
-    setRestrictions(t?.restrictions || '');
-    setPriority(t?.priority || 1);
+    const tpl = initialTemplate ? NIGHT_SHIFT_TEMPLATES[initialTemplate] : null;
+    setTaskType(tpl?.task_type || initialType || 'content');
+    setTitle(tpl?.title || '');
+    setPrompt(tpl?.prompt || '');
+    setOutputPath(tpl?.output_path || '');
+    setScope(tpl?.scope || '');
+    setGitBranch(tpl?.git_branch || '');
+    setRestrictions(tpl?.restrictions || '');
+    setPriority(tpl?.priority || 'high');
     setSchedule('tonight');
-  }, [initialTemplate, initialType]);
+  }, [isOpen, initialTemplate, initialType]);
 
-  // Fix #3: Escape key support
+  // Fix #3: Escape key closes modal
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // Fix #5: Validation — title and prompt are required
+  const isTitleEmpty = !title.trim();
+  const isPromptEmpty = !prompt.trim();
+  const isValid = !isTitleEmpty && !isPromptEmpty;
 
-  const isValid = title.trim().length > 0 && prompt.trim().length > 0;
-
-  const handleAddToQueue = () => {
+  // Fix #1: Wire up "Add to Queue" — build a task object and call onAdd
+  const handleSubmit = useCallback(() => {
     if (!isValid) return;
     const now = new Date().toISOString();
+    let scheduleDate: string;
+    if (schedule === 'tomorrow') {
+      const tomorrow = new Date(Date.now() + 86_400_000);
+      scheduleDate = tomorrow.toISOString().split('T')[0];
+    } else {
+      scheduleDate = new Date().toISOString().split('T')[0];
+    }
+
     const newTask: NightShiftTask = {
       id: `ns-${Date.now()}`,
       task_type: taskType,
       title: title.trim(),
       prompt: prompt.trim(),
-      scope,
-      output_path: outputPath,
-      git_branch: gitBranch,
-      restrictions,
+      scope: scope.trim(),
+      output_path: outputPath.trim(),
+      git_branch: gitBranch.trim(),
+      restrictions: restrictions.trim(),
       priority,
-      schedule_date: new Date().toISOString().slice(0, 10),
+      schedule_date: scheduleDate,
       status: 'queued',
       started_at: null,
       completed_at: null,
@@ -399,9 +411,11 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
       created_at: now,
       updated_at: now,
     };
-    onAddTask(newTask);
+    onAdd(newTask);
     onClose();
-  };
+  }, [isValid, schedule, taskType, title, prompt, scope, outputPath, gitBranch, restrictions, priority, onAdd, onClose]);
+
+  if (!isOpen) return null;
 
   const typeButtons: { key: string; icon: typeof Code; label: string }[] = [
     { key: 'code', icon: Code, label: 'Code' },
@@ -410,13 +424,20 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
     { key: 'audit', icon: Shield, label: 'Audit' },
   ];
 
+  const priorityButtons: { key: 'high' | 'medium' | 'low'; label: string }[] = [
+    { key: 'high', label: 'High - Run First' },
+    { key: 'medium', label: 'Medium' },
+    { key: 'low', label: 'Low - Run Last' },
+  ];
+
   return (
-    // Fix #4: Backdrop click to close; Fix #6: ARIA attributes
+    // Fix #4: Backdrop click closes modal
+    // Fix #6: aria-modal and role="dialog"
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-      onClick={onClose}
       role="dialog"
       aria-modal="true"
+      onClick={onClose}
     >
       <div
         className="glass-panel rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6"
@@ -424,11 +445,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-white">New Night Shift Assignment</h2>
-          <button
-            onClick={onClose}
-            aria-label="Close dialog"
-            className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
             <X size={20} />
           </button>
         </div>
@@ -457,27 +474,35 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
           </div>
         </div>
 
-        {/* Title — Fix #5: maxLength */}
+        {/* Title — Fix #5: required + maxLength */}
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Title</label>
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Title <span className="text-rose-400">*</span>
+          </label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+            className={`w-full bg-black/30 border rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 ${
+              isTitleEmpty && title !== '' ? 'border-rose-500/50' : 'border-white/10'
+            }`}
             placeholder="e.g., Write 2 SEO blog posts"
           />
         </div>
 
-        {/* Prompt / Details — Fix #5: maxLength */}
+        {/* Prompt / Details — Fix #5: required + maxLength */}
         <div className="mb-4">
-          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Assignment Details</label>
+          <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+            Assignment Details <span className="text-rose-400">*</span>
+          </label>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             maxLength={5000}
             rows={6}
-            className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 resize-y"
+            className={`w-full bg-black/30 border rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 resize-y ${
+              isPromptEmpty && prompt !== '' ? 'border-rose-500/50' : 'border-white/10'
+            }`}
             placeholder="Write the full prompt/instructions for Claude here..."
           />
         </div>
@@ -489,6 +514,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
             <input
               value={scope}
               onChange={(e) => setScope(e.target.value)}
+              maxLength={500}
               className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
               placeholder="e.g., /content/, /pages/"
             />
@@ -498,6 +524,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
             <input
               value={outputPath}
               onChange={(e) => setOutputPath(e.target.value)}
+              maxLength={500}
               className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
               placeholder="e.g., /content/blog/drafts/"
             />
@@ -511,6 +538,7 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
             <input
               value={gitBranch}
               onChange={(e) => setGitBranch(e.target.value)}
+              maxLength={200}
               className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50"
               placeholder="feature/..."
             />
@@ -523,28 +551,29 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
           <textarea
             value={restrictions}
             onChange={(e) => setRestrictions(e.target.value)}
+            maxLength={2000}
             rows={2}
             className="w-full bg-black/30 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500/50 resize-y"
             placeholder='e.g., "Do not modify auth, do not push to main"'
           />
         </div>
 
-        {/* Priority */}
+        {/* Priority — Fix #7: string-based priority */}
         <div className="flex gap-6 mb-5">
           <div>
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Priority</label>
             <div className="flex gap-2">
-              {[1, 2, 3].map((p) => (
+              {priorityButtons.map((p) => (
                 <button
-                  key={p}
-                  onClick={() => setPriority(p)}
+                  key={p.key}
+                  onClick={() => setPriority(p.key)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    priority === p
+                    priority === p.key
                       ? 'bg-white/10 text-white ring-1 ring-white/20'
                       : 'text-gray-400 hover:bg-white/5'
                   }`}
                 >
-                  {p === 1 ? '1 - Run First' : p === 3 ? '3 - Run Last' : '2'}
+                  {p.label}
                 </button>
               ))}
             </div>
@@ -573,18 +602,18 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ isOpen, onClose, onAd
           </div>
         </div>
 
-        {/* Actions — Fix #1: Wire up Add to Queue; Fix #5: Disable when invalid */}
+        {/* Actions — Fix #1: submit handler with validation */}
         <div className="flex justify-end gap-3 pt-4 border-t border-white/5">
           <button onClick={onClose} className="px-6 py-2.5 text-gray-400 hover:text-white text-sm font-medium transition-colors">
             Cancel
           </button>
           <button
-            onClick={handleAddToQueue}
+            onClick={handleSubmit}
             disabled={!isValid}
             className={`px-6 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-purple-500/20 ${
               isValid
-                ? 'bg-purple-600 hover:bg-purple-500 cursor-pointer'
-                : 'bg-purple-600/40 cursor-not-allowed opacity-50'
+                ? 'bg-purple-600 hover:bg-purple-500'
+                : 'bg-purple-600/40 cursor-not-allowed'
             }`}
           >
             Add to Queue
@@ -603,9 +632,9 @@ const NightShift: React.FC = () => {
   const [modalTemplate, setModalTemplate] = useState<string | undefined>();
   const [modalType, setModalType] = useState<string | undefined>();
 
-  const handleAddTask = (task: NightShiftTask) => {
+  const handleAddTask = useCallback((task: NightShiftTask) => {
     setQueue((prev) => [...prev, task]);
-  };
+  }, []);
 
   const openFromTemplate = (templateKey: string) => {
     setModalTemplate(templateKey);
@@ -647,7 +676,7 @@ const NightShift: React.FC = () => {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="Queued Tonight" value={String(queue.length)} icon={Clock} color="purple" />
+        <StatCard title="Queued Tonight" value="2" icon={Clock} color="purple" />
         <StatCard title="Completed" value="12" icon={CheckCircle2} color="emerald" trend="up" trendValue="+3 this week" />
         <StatCard title="Failed" value="1" icon={XCircle} color="rose" subValue="last 7 days" />
         <StatCard title="Pending Review" value="2" icon={Eye} color="amber" subValue="from last night" />
@@ -684,53 +713,44 @@ const NightShift: React.FC = () => {
           <h2 className="text-xl font-semibold text-white">Tonight's Queue</h2>
           <span className="text-sm text-gray-500">{queue.length} tasks</span>
         </div>
-        {/* Fix #7: Empty state for Tonight's Queue */}
-        {queue.length === 0 ? (
-          <div className="glass-card rounded-2xl p-10 border border-white/5 text-center">
-            <Moon className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400 text-sm mb-1">No tasks queued for tonight.</p>
-            <p className="text-gray-500 text-xs">Click "New Assignment" or use a template above to add one.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {queue.map((task, idx) => (
-              <div key={task.id} className="glass-card rounded-2xl p-6 border border-white/5 hover:border-purple-500/20 transition-colors">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg font-bold text-gray-500">{idx + 1}.</span>
-                    <TaskTypeIcon type={task.task_type} size="lg" />
-                    <span className="text-xs text-gray-500">Priority: {task.priority}</span>
-                  </div>
-                </div>
-                <h3 className="text-lg font-semibold text-white mb-3">"{task.title}"</h3>
-                {/* Fix #8: word-break on pre tag */}
-                <pre className="text-sm text-gray-400 whitespace-pre-wrap break-words font-sans mb-4 leading-relaxed">{task.prompt}</pre>
-                {task.restrictions && (
-                  <div className="flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/5 px-3 py-2 rounded-lg mb-4">
-                    <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-                    <span>{task.restrictions}</span>
-                  </div>
-                )}
-                {task.output_path && (
-                  <p className="text-xs text-gray-500 mb-4">Output: <code className="text-gray-400">{task.output_path}</code></p>
-                )}
-                <div className="flex gap-2">
-                  <button className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1">
-                    <Edit3 size={12} /> Edit
-                  </button>
-                  <button className="text-xs text-gray-400 hover:text-rose-400 px-3 py-1.5 rounded-lg hover:bg-rose-500/5 transition-colors flex items-center gap-1">
-                    <Trash2 size={12} /> Remove
-                  </button>
-                  {idx > 0 && (
-                    <button className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1">
-                      <ChevronUp size={12} /> Move Up
-                    </button>
-                  )}
+        <div className="space-y-4">
+          {queue.map((task, idx) => (
+            <div key={task.id} className="glass-card rounded-2xl p-6 border border-white/5 hover:border-purple-500/20 transition-colors">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg font-bold text-gray-500">{idx + 1}.</span>
+                  <TaskTypeIcon type={task.task_type} size="lg" />
+                  <span className="text-xs text-gray-500">Priority: {capitalize(task.priority)}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              <h3 className="text-lg font-semibold text-white mb-3">"{task.title}"</h3>
+              {/* Fix #8: overflow-wrap: break-word on pre */}
+              <pre className="text-sm text-gray-400 whitespace-pre-wrap font-sans mb-4 leading-relaxed" style={{ overflowWrap: 'break-word' }}>{task.prompt}</pre>
+              {task.restrictions && (
+                <div className="flex items-start gap-2 text-xs text-amber-400/80 bg-amber-400/5 px-3 py-2 rounded-lg mb-4">
+                  <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+                  <span>{task.restrictions}</span>
+                </div>
+              )}
+              {task.output_path && (
+                <p className="text-xs text-gray-500 mb-4">Output: <code className="text-gray-400">{task.output_path}</code></p>
+              )}
+              <div className="flex gap-2">
+                <button className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1">
+                  <Edit3 size={12} /> Edit
+                </button>
+                <button className="text-xs text-gray-400 hover:text-rose-400 px-3 py-1.5 rounded-lg hover:bg-rose-500/5 transition-colors flex items-center gap-1">
+                  <Trash2 size={12} /> Remove
+                </button>
+                {idx > 0 && (
+                  <button className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1">
+                    <ChevronUp size={12} /> Move Up
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Morning Review */}
@@ -885,11 +905,11 @@ const NightShift: React.FC = () => {
         </div>
       </section>
 
-      {/* Modal — Fix #1: Pass onAddTask */}
+      {/* Modal */}
       <AssignmentModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        onAddTask={handleAddTask}
+        onAdd={handleAddTask}
         initialType={modalType}
         initialTemplate={modalTemplate}
       />

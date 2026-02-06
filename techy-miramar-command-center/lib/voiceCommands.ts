@@ -1,12 +1,12 @@
-// ── Shared Voice Command definitions & matching ─────────────────────────
+// Shared voice command definitions used by both VoiceFAB and Voice page.
 
-export interface VoiceCommandDef {
+export interface VoiceCommand {
   type: string;
   patterns: string[];
   description: string;
 }
 
-export const VOICE_COMMANDS: VoiceCommandDef[] = [
+export const VOICE_COMMANDS: VoiceCommand[] = [
   { type: 'add_lead', patterns: ['add a lead', 'new lead', 'add lead', 'new walk-in', 'add customer', 'new customer'], description: 'Add a new lead/customer' },
   { type: 'check_repairs', patterns: ['what repairs are pending', 'pending repairs', "what's in the shop", 'how many repairs', 'active tickets', 'what needs attention'], description: 'Check active repairs' },
   { type: 'schedule_pickup', patterns: ['schedule pickup', 'ready for pickup', 'mark as done', 'repair done', 'finished repair'], description: 'Mark repair as complete' },
@@ -19,8 +19,8 @@ export const VOICE_COMMANDS: VoiceCommandDef[] = [
 ];
 
 export const MOCK_RESPONSES: Record<string, string> = {
-  add_lead: "Lead #248 created for Maria — Samsung Galaxy S24 — Won't charge. Telegram alert sent.",
-  check_repairs: "4 active repairs. 1 urgent: John D's iPhone 14 has been in diagnosing for 52 hours.",
+  add_lead: 'Lead #248 created for Maria — Samsung Galaxy S24 — Won\'t charge. Telegram alert sent.',
+  check_repairs: '4 active repairs. 1 urgent: John D\'s iPhone 14 has been in diagnosing for 52 hours.',
   schedule_pickup: 'Marked MacBook Pro for Sarah as done. Pickup notification will send automatically.',
   check_midas: '1 hot deal: MacBook Pro 15" 2015 on eBay for $95 — estimated margin $215. Buy rules pass.',
   emilio_stats: '247 sent this week. 34% open rate, 4.2% reply rate. 3 demos booked.',
@@ -30,38 +30,6 @@ export const MOCK_RESPONSES: Record<string, string> = {
   read_alerts: '2 alerts. Critical: John D ticket stalled over 48 hours. Warning: ReviewGuard demo in 15 minutes.',
 };
 
-export interface MatchResult {
-  type: string;
-  confidence: number;
-}
-
-export function matchCommand(transcript: string): MatchResult | null {
-  const lower = transcript.toLowerCase().trim();
-  if (!lower) return null;
-
-  let bestMatch: MatchResult | null = null;
-
-  for (const cmd of VOICE_COMMANDS) {
-    for (const pattern of cmd.patterns) {
-      if (lower.includes(pattern)) {
-        const confidence = Math.min(pattern.length / lower.length, 1);
-        if (!bestMatch || confidence > bestMatch.confidence) {
-          bestMatch = { type: cmd.type, confidence };
-        }
-      }
-    }
-  }
-
-  return bestMatch;
-}
-
-export function getResponse(matchType: string | null, transcript: string): string {
-  if (matchType) {
-    return MOCK_RESPONSES[matchType] || 'Command recognized but no handler available yet.';
-  }
-  return `I heard: "${transcript}". I'm not sure what action to take. Try one of the quick commands, or rephrase your request.`;
-}
-
 export const QUICK_COMMANDS = [
   { label: 'Add a new lead', command: 'add a new lead' },
   { label: 'What repairs are pending?', command: 'what repairs are pending' },
@@ -70,5 +38,29 @@ export const QUICK_COMMANDS = [
   { label: 'Schedule a pickup', command: 'schedule a pickup' },
   { label: 'Show revenue this month', command: 'show revenue this month' },
   { label: 'Queue a Claude task', command: 'queue a claude task' },
-  { label: "Read me today's critical alerts", command: "read me today's critical alerts" },
+  { label: "Read me today's critical alerts", command: 'read me today\'s critical alerts' },
 ];
+
+/**
+ * Match a transcript to a known command using pattern matching.
+ * Returns the best match with a confidence score, or null if no match.
+ */
+export function matchCommand(transcript: string): { type: string; confidence: number } | null {
+  const lower = transcript.toLowerCase().trim();
+  if (!lower) return null;
+
+  let bestMatch: { type: string; confidence: number } | null = null;
+
+  for (const cmd of VOICE_COMMANDS) {
+    for (const pattern of cmd.patterns) {
+      if (lower.includes(pattern)) {
+        const confidence = pattern.length / lower.length;
+        if (!bestMatch || confidence > bestMatch.confidence) {
+          bestMatch = { type: cmd.type, confidence: Math.min(confidence, 1) };
+        }
+      }
+    }
+  }
+
+  return bestMatch;
+}

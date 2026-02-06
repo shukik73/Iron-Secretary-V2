@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Mic, MicOff, X, ExternalLink, CheckCircle2, Loader, RotateCcw } from 'lucide-react';
-import { matchCommand, getResponse } from '../lib/voiceCommands';
+import { matchCommand, MOCK_RESPONSES } from '../lib/voiceCommands';
 
 interface VoiceFABProps {
   onNavigateToVoice?: () => void;
@@ -14,10 +14,10 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   const [transcript, setTranscript] = useState('');
   const [response, setResponse] = useState('');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const stateRef = useRef<ModalState>('idle');
-  const transcriptRef = useRef('');
+  const stateRef = useRef(state);
+  const transcriptRef = useRef(transcript);
 
-  // Keep refs in sync so callbacks always see current values
+  // Keep refs in sync to avoid stale closures in speech callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
@@ -26,12 +26,19 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
     const match = matchCommand(text);
 
     setTimeout(() => {
-      const responseText = getResponse(match?.type ?? null, text);
-      setResponse(responseText);
-      setState('done');
+      const matched = match?.type;
+      if (matched) {
+        setResponse(MOCK_RESPONSES[matched] || 'Command recognized.');
+        setState('done');
+      } else {
+        setResponse(`I heard: "${text}" but I'm not sure what to do. Try the Voice page for more options.`);
+        setState('done');
+      }
 
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(responseText);
+        const utterance = new SpeechSynthesisUtterance(
+          matched ? MOCK_RESPONSES[matched] || 'Done.' : "I'm not sure what to do."
+        );
         utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
       }
@@ -44,15 +51,15 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
     setTranscript('');
     setResponse('');
 
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) {
+    const SpeechRecognitionApi = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionApi) {
       setState('error');
-      setResponse('Speech recognition is not supported in this browser. Try Chrome or Edge.');
+      setResponse('Speech recognition is not supported in this browser. Try Chrome.');
       return;
     }
 
     try {
-      const recognition = new SpeechRecognitionAPI();
+      const recognition = new SpeechRecognitionApi();
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
@@ -69,6 +76,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
           }
         }
         setTranscript(finalTranscript || interimTranscript);
+
         if (finalTranscript) {
           processCommand(finalTranscript);
         }
@@ -76,14 +84,13 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         setState('error');
-        setResponse(`Error: ${event.error}. Please try again.`);
+        setResponse(`Error: ${event.error}`);
       };
 
       recognition.onend = () => {
-        // Use refs to avoid stale closure
+        // Use refs to get current values (avoids stale closure)
         if (stateRef.current === 'listening' && !transcriptRef.current) {
           setState('idle');
-          setModalOpen(false);
         }
       };
 
@@ -91,11 +98,11 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       recognition.start();
     } catch (err) {
       setState('error');
-      setResponse('Could not start speech recognition. Check microphone permissions.');
+      setResponse('Failed to start speech recognition. Check microphone permissions.');
     }
   }, [processCommand]);
 
-  const handleClose = useCallback(() => {
+  const handleClose = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
@@ -106,75 +113,26 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
     setState('idle');
     setTranscript('');
     setResponse('');
-  }, []);
+  };
 
-  const handleRetry = useCallback(() => {
+  const handleCancel = () => {
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setState('listening');
+    setState('idle');
     setTranscript('');
     setResponse('');
+  };
 
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionAPI) return;
-
-    try {
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0].transcript;
-          } else {
-            interimTranscript += result[0].transcript;
-          }
-        }
-        setTranscript(finalTranscript || interimTranscript);
-        if (finalTranscript) {
-          processCommand(finalTranscript);
-        }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        setState('error');
-        setResponse(`Error: ${event.error}. Please try again.`);
-      };
-
-      recognition.onend = () => {
-        if (stateRef.current === 'listening' && !transcriptRef.current) {
-          setState('idle');
-          setModalOpen(false);
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch {
-      setState('error');
-      setResponse('Could not restart speech recognition.');
-    }
-  }, [processCommand]);
-
-  // Escape key closes modal
+  // Close modal on Escape key
   useEffect(() => {
+    if (!modalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && modalOpen) {
-        handleClose();
-      }
+      if (e.key === 'Escape') handleClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [modalOpen, handleClose]);
+  }, [modalOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -189,8 +147,9 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       {/* FAB Button */}
       <button
         onClick={startListening}
+        aria-label="Voice Command"
         className="fixed bottom-8 right-8 p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform z-40 group"
-        aria-label="Open voice command"
+        title="Voice Assistant"
       >
         <Mic size={24} className="group-hover:scale-110 transition-transform" />
         <span className="absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity pointer-events-none border border-white/10">
@@ -205,17 +164,14 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
           onClick={handleClose}
           role="dialog"
           aria-modal="true"
-          aria-label="Voice command modal"
+          aria-label="Voice Assistant"
         >
-          <div
-            className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center relative"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="glass-panel rounded-2xl w-full max-w-sm p-6 text-center relative" onClick={(e) => e.stopPropagation()}>
             {/* Close button */}
             <button
               onClick={handleClose}
+              aria-label="Close voice assistant"
               className="absolute top-4 right-4 p-1 text-gray-500 hover:text-white transition-colors"
-              aria-label="Close voice modal"
             >
               <X size={18} />
             </button>
@@ -231,13 +187,13 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 </div>
                 <p className="text-white font-semibold mb-2">Listening...</p>
                 {transcript && (
-                  <p className="text-gray-300 text-sm mb-4">"{transcript}"</p>
+                  <p className="text-gray-300 text-sm mb-4">&quot;{transcript}&quot;</p>
                 )}
                 <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden mb-4">
                   <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse" style={{ width: '60%' }} />
                 </div>
                 <button
-                  onClick={handleClose}
+                  onClick={handleCancel}
                   className="text-sm text-gray-400 hover:text-white transition-colors"
                 >
                   Cancel
@@ -250,7 +206,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
               <>
                 <Loader size={32} className="text-purple-400 mx-auto mb-4 animate-spin" />
                 <p className="text-white font-semibold mb-2">Processing...</p>
-                <p className="text-gray-400 text-sm">"{transcript}"</p>
+                <p className="text-gray-400 text-sm">&quot;{transcript}&quot;</p>
               </>
             )}
 
@@ -262,9 +218,8 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 <p className="text-gray-300 text-sm mb-6">{response}</p>
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={handleRetry}
+                    onClick={startListening}
                     className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
-                    aria-label="Try another voice command"
                   >
                     <RotateCcw size={12} /> Try Again
                   </button>
@@ -297,9 +252,8 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
                 <p className="text-gray-400 text-sm mb-4">{response}</p>
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={handleRetry}
+                    onClick={startListening}
                     className="text-xs text-gray-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-1"
-                    aria-label="Try again"
                   >
                     <RotateCcw size={12} /> Try Again
                   </button>

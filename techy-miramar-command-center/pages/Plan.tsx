@@ -45,7 +45,7 @@ const phases = [
   },
   {
     id: 4,
-    name: 'Phase 4: Iron Secretary',
+    name: 'Phase 4: Iron Secretary V2',
     weeks: 'Q3–Q4',
     focus: 'Voice Automation',
     status: 'locked',
@@ -78,7 +78,7 @@ const Plan: React.FC = () => {
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white border border-white/10">v2.2</span>
                 <span className="text-gray-500 text-xs font-mono uppercase">Sequenced Execution Plan</span>
             </div>
-            <h1 className="text-4xl font-bold text-white tracking-tight">Master Plan 2026</h1>
+            <h1 className="text-3xl font-bold text-white tracking-tight">Master Plan 2026</h1>
             <p className="text-gray-400 mt-2 max-w-2xl text-sm leading-relaxed">
                 "Ship one thing at a time. Revenue before features. Kill what doesn't work."
             </p>
