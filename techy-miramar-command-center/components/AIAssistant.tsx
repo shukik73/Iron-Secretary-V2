@@ -41,7 +41,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
                 </p>
             </div>
         </div>
-        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+        <button aria-label="Close copilot" onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={18} />
         </button>
       </div>
@@ -91,6 +91,7 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Ask Copilot to organize tasks..."
+                maxLength={500}
                 className="w-full bg-gray-900/50 border border-white/10 rounded-xl pl-4 pr-10 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             />
             <button 

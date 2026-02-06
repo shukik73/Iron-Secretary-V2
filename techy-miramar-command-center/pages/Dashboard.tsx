@@ -43,7 +43,7 @@ const Dashboard: React.FC = () => {
           <h1 className="text-4xl font-bold text-white tracking-tight mb-2">Good afternoon, Boss.</h1>
           <p className="text-gray-400 flex items-center">
             <Calendar className="w-4 h-4 mr-2" />
-            Tuesday, February 24 • Daily Cadence Active.
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • Daily Cadence Active.
           </p>
         </div>
         <div className="flex space-x-3 mt-4 md:mt-0">
@@ -80,7 +80,7 @@ const Dashboard: React.FC = () => {
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${task.color}`}>
                                 {task.tag}
                             </span>
-                            <button className="ml-4 opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg text-gray-400 transition-all">
+                            <button aria-label="Mark task complete" className="ml-4 opacity-0 group-hover:opacity-100 p-2 hover:bg-white/10 rounded-lg text-gray-400 transition-all">
                                 <CheckCircle2 size={18} />
                             </button>
                         </div>

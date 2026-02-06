@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Clock, CheckCircle, Phone, MessageCircle } from 'lucide-react';
+import { User, Clock, CheckCircle2, Phone, MessageCircle } from 'lucide-react';
 import StatCard from '../components/StatCard';
 
 const leads = [
@@ -21,7 +21,7 @@ const Leads: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard title="New Today" value="3" icon={User} color="blue" />
         <StatCard title="In Repair" value="7" icon={Clock} color="amber" />
-        <StatCard title="Ready" value="2" icon={CheckCircle} color="emerald" />
+        <StatCard title="Ready" value="2" icon={CheckCircle2} color="emerald" />
         <StatCard title="Awaiting Pickup" value="1" icon={Phone} trend="down" color="rose" />
       </div>
 
@@ -82,7 +82,7 @@ const Leads: React.FC = () => {
                     </div>
                     <div className="flex space-x-2 mt-2">
                          <button className="flex items-center text-xs bg-emerald-600/20 text-emerald-400 px-3 py-1 rounded border border-emerald-600/30">
-                            <CheckCircle size={12} className="mr-1" /> Reminder Sent
+                            <CheckCircle2 size={12} className="mr-1" /> Reminder Sent
                          </button>
                     </div>
                 </div>
@@ -114,7 +114,7 @@ const Leads: React.FC = () => {
                                 </span>
                             </td>
                             <td className="py-3 text-right">
-                                <button className="text-gray-500 hover:text-white">
+                                <button aria-label="Message customer" className="text-gray-500 hover:text-white">
                                     <MessageCircle size={16} />
                                 </button>
                             </td>
