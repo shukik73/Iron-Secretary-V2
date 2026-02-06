@@ -13,6 +13,12 @@ import {
   Command,
   Bot,
   Moon,
+  Sunrise,
+  Inbox,
+  UserCircle,
+  CalendarDays,
+  CheckSquare,
+  BarChart3,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,6 +32,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
   const navItems = [
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
+      { id: 'morning-briefing', label: 'Morning Briefing', icon: Sunrise },
+      { id: 'smart-today', label: 'Today', icon: CheckSquare },
+      { id: 'timeline', label: 'Schedule', icon: CalendarDays },
       { id: 'plan', label: 'Projects & Tasks', icon: Layers },
       { id: 'ai-workspace', label: 'AI Workspace', icon: Bot },
       { id: 'night-shift', label: 'Night Shift', icon: Moon },
@@ -34,7 +43,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
       { id: 'emilio', label: 'Emilio', icon: Mail, badge: '3' },
       { id: 'midas', label: 'Midas', icon: Zap, badge: '1', badgeColor: 'text-amber-400 bg-amber-400/10' },
       { id: 'leads', label: 'Leads', icon: Users, badge: '2', badgeColor: 'text-rose-400 bg-rose-400/10' },
+      { id: 'customer-360', label: 'Customers', icon: UserCircle },
       { id: 'reviewguard', label: 'ReviewGuard', icon: ShieldCheck },
+    ]},
+    { section: 'Reports', items: [
+      { id: 'inbox', label: 'Inbox', icon: Inbox, badge: '5', badgeColor: 'text-blue-400 bg-blue-400/10' },
+      { id: 'weekly-review', label: 'Weekly Review', icon: BarChart3 },
     ]},
   ];
 
