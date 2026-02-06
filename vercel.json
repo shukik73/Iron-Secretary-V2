@@ -1,8 +1,8 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": "vite",
+  "buildCommand": "cd techy-miramar-command-center && npm run build",
+  "outputDirectory": "techy-miramar-command-center/dist",
+  "installCommand": "cd techy-miramar-command-center && npm install",
+  "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
