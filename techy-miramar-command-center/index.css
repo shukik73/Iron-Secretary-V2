@@ -77,23 +77,101 @@ body {
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
 }
 
-/* Light mode structural overrides — uses main-bg class to avoid CSS selector issues */
+/* ── Light Mode — Comprehensive Overrides ─────────────────── */
+
+/* Layout backgrounds */
 .light .main-bg { background-color: #f8fafc; }
-.light .sidebar-bg { background: rgba(255, 255, 255, 0.85); }
+.light .sidebar-bg { background: rgba(255, 255, 255, 0.92); border-color: #e2e8f0; }
+
+/* Dark hex backgrounds → light */
+.light .bg-\[\#030712\] { background-color: #f8fafc; }
+.light .bg-\[\#09090b\] { background-color: #f8fafc; }
+.light .bg-\[\#0a0a0b\] { background-color: #f8fafc; }
+
+/* Gray backgrounds */
 .light .bg-gray-900 { background-color: #ffffff; }
 .light .bg-gray-900\/50 { background-color: rgba(255, 255, 255, 0.5); }
+.light .bg-gray-900\/80 { background-color: rgba(255, 255, 255, 0.8); }
 .light .bg-gray-800 { background-color: #f1f5f9; }
 .light .bg-gray-800\/50 { background-color: rgba(241, 245, 249, 0.5); }
+.light .bg-gray-800\/40 { background-color: rgba(241, 245, 249, 0.4); }
+.light .bg-gray-700 { background-color: #e2e8f0; }
+
+/* Black backgrounds → light equivalents */
+.light .bg-black { background-color: #ffffff; }
+.light .bg-black\/20 { background-color: rgba(0, 0, 0, 0.03); }
+.light .bg-black\/40 { background-color: rgba(0, 0, 0, 0.04); }
+.light .bg-black\/60 { background-color: rgba(0, 0, 0, 0.06); }
+
+/* White alpha backgrounds → dark tints for visibility on light bg */
+.light .bg-white\/5 { background-color: rgba(0, 0, 0, 0.03); }
+.light .bg-white\/10 { background-color: rgba(0, 0, 0, 0.05); }
+.light .bg-white\/15 { background-color: rgba(0, 0, 0, 0.06); }
+.light .bg-white\/20 { background-color: rgba(0, 0, 0, 0.08); }
+
+/* Hover state backgrounds */
+.light .hover\:bg-white\/5:hover { background-color: rgba(0, 0, 0, 0.04); }
+.light .hover\:bg-white\/10:hover { background-color: rgba(0, 0, 0, 0.06); }
+
+/* Border overrides */
 .light .border-gray-800 { border-color: #e2e8f0; }
 .light .border-gray-800\/50 { border-color: rgba(226, 232, 240, 0.5); }
+.light .border-gray-700 { border-color: #cbd5e1; }
 .light .border-gray-700\/50 { border-color: rgba(203, 213, 225, 0.5); }
+.light .border-gray-600 { border-color: #94a3b8; }
 .light .border-white\/5 { border-color: rgba(0, 0, 0, 0.06); }
 .light .border-white\/10 { border-color: rgba(0, 0, 0, 0.08); }
+.light .border-white\/20 { border-color: rgba(0, 0, 0, 0.1); }
+
+/* Text colors */
 .light .text-white { color: #1e293b; }
+.light .text-gray-100 { color: #1e293b; }
 .light .text-gray-200 { color: #334155; }
 .light .text-gray-300 { color: #475569; }
 .light .text-gray-400 { color: #64748b; }
 .light .text-gray-500 { color: #94a3b8; }
+
+/* Hover text */
+.light .hover\:text-white:hover { color: #0f172a; }
+.light .hover\:text-gray-200:hover { color: #334155; }
+.light .hover\:text-gray-300:hover { color: #475569; }
+.light .group:hover .group-hover\:text-white { color: #0f172a; }
+.light .group:hover .group-hover\:text-gray-300 { color: #475569; }
+
+/* Placeholder text */
+.light .placeholder-gray-500::placeholder { color: #94a3b8; }
+.light .placeholder-gray-600::placeholder { color: #64748b; }
+
+/* Ring / outline */
+.light .ring-white\/5 { --tw-ring-color: rgba(0, 0, 0, 0.06); }
+.light .ring-white\/10 { --tw-ring-color: rgba(0, 0, 0, 0.08); }
+
+/* Shadow overrides */
+.light .shadow-white\/10 { --tw-shadow-color: rgba(0, 0, 0, 0.06); }
+.light .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04); }
+.light .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12); }
+
+/* Background gradients that reference dark colors */
+.light .from-gray-900 { --tw-gradient-from: #f8fafc; }
+.light .to-gray-950 { --tw-gradient-to: #f1f5f9; }
+
+/* Focus ring overrides */
+.light .focus\:ring-white\/20:focus { --tw-ring-color: rgba(59, 130, 246, 0.3); }
+.light .focus\:border-white\/20:focus { border-color: rgba(59, 130, 246, 0.3); }
+
+/* Divide colors */
+.light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0, 0, 0, 0.06); }
+.light .divide-white\/10 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0, 0, 0, 0.08); }
+.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0; }
+
+/* Background blur panels in light mode — keep readable */
+.light .backdrop-blur-xl { backdrop-filter: blur(20px); }
+
+/* Gradient orbs (decorative bg elements) — soften for light mode */
+.light .bg-purple-900\/20 { background-color: rgba(147, 51, 234, 0.06); }
+.light .bg-blue-900\/10 { background-color: rgba(59, 130, 246, 0.04); }
+.light .bg-purple-900\/10 { background-color: rgba(147, 51, 234, 0.04); }
+.light .bg-indigo-900\/20 { background-color: rgba(99, 102, 241, 0.06); }
 
 /* Fallback for devices without backdrop-filter support */
 @supports not (backdrop-filter: blur(8px)) {

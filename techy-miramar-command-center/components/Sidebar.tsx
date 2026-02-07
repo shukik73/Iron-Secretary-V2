@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
             </div>
           </div>
 
-          <div className="flex-1 space-y-8">
+          <div className="flex-1 space-y-8 overflow-y-auto min-h-0">
             {navItems.map((group, idx) => (
               <div key={idx}>
                 <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{group.section}</h3>
