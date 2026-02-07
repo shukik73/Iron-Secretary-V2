@@ -39,8 +39,8 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       // Update conversation history (keep last 10 exchanges)
       setConversationHistory(prev => [
         ...prev,
-        { role: 'user', content: text },
-        { role: 'assistant', content: aiResponse },
+        { role: 'user' as const, content: text },
+        { role: 'assistant' as const, content: aiResponse },
       ].slice(-20));
 
       // Speak the response

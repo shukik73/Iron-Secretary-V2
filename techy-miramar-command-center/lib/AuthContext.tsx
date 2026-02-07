@@ -81,6 +81,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       setLoading(false);
+    }).catch(() => {
+      // Auth check failed (network error, invalid config, etc.)
+      // Still clear loading so the app renders the login screen.
+      setLoading(false);
     });
 
     // 2. Subscribe to auth state changes (login, logout, token refresh, etc.).

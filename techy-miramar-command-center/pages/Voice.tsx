@@ -97,8 +97,8 @@ const Voice: React.FC = () => {
       // Update chat history (keep last 20 messages)
       setChatHistory(prev => [
         ...prev,
-        { role: 'user', content: text },
-        { role: 'assistant', content: aiResponse },
+        { role: 'user' as const, content: text },
+        { role: 'assistant' as const, content: aiResponse },
       ].slice(-20));
 
       // Add to logs
