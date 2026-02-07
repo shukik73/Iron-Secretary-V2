@@ -23,7 +23,7 @@ import TimelineCalendar from './pages/TimelineCalendar';
 import ReviewGuard from './pages/ReviewGuard';
 
 function App() {
-  const { user, loading, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
+  const { user, loading, isRecovery, clearRecovery, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
@@ -44,15 +44,20 @@ function App() {
     );
   }
 
-  // Show login screen if not authenticated
-  if (!user) {
+  // Show login screen if not authenticated, or reset form if in recovery mode
+  if (!user || isRecovery) {
     return (
       <Login
         onAuth={() => {}}
         onSignIn={signIn}
         onSignUp={signUp}
         onResetPassword={resetPassword}
-        onUpdatePassword={updatePassword}
+        onUpdatePassword={async (pw) => {
+          const result = await updatePassword(pw);
+          if (!result.error) clearRecovery();
+          return result;
+        }}
+        forceView={isRecovery ? 'reset' : undefined}
       />
     );
   }

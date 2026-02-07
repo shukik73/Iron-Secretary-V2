@@ -18,6 +18,8 @@ interface LoginProps {
   onSignUp: (email: string, password: string, fullName: string) => Promise<{ error: { message: string } | null }>;
   onResetPassword: (email: string) => Promise<{ error: { message: string } | null }>;
   onUpdatePassword: (password: string) => Promise<{ error: { message: string } | null }>;
+  /** When set, forces the component to open on this view (e.g. 'reset' for recovery) */
+  forceView?: View;
 }
 
 type View = 'login' | 'signup' | 'forgot' | 'reset';
@@ -33,8 +35,8 @@ function getPasswordStrength(password: string): { label: string; score: number; 
   return { label: 'Strong', score: 3, color: 'bg-emerald-500' };
 }
 
-export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onUpdatePassword }: LoginProps) {
-  const [view, setView] = useState<View>('login');
+export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onUpdatePassword, forceView }: LoginProps) {
+  const [view, setView] = useState<View>(forceView ?? 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,12 +47,12 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Check for password recovery hash on mount
+  // Sync with forceView prop (e.g. when AuthContext detects PASSWORD_RECOVERY)
   useEffect(() => {
-    if (window.location.hash.includes('type=recovery')) {
-      setView('reset');
+    if (forceView) {
+      setView(forceView);
     }
-  }, []);
+  }, [forceView]);
 
   function resetForm() {
     setEmail('');

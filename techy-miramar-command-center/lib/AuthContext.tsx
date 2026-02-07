@@ -16,6 +16,9 @@ interface AuthContextValue {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /** True when the user arrived via a password recovery link */
+  isRecovery: boolean;
+  clearRecovery: () => void;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
@@ -59,6 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
+
+  const clearRecovery = () => setIsRecovery(false);
 
   useEffect(() => {
     // If Supabase is not configured, fall back to a demo user so the app
@@ -80,9 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 2. Subscribe to auth state changes (login, logout, token refresh, etc.).
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
+
+      // Detect when the user arrives via a password recovery link.
+      // Supabase fires PASSWORD_RECOVERY after exchanging the token.
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+      }
     });
 
     return () => {
@@ -132,7 +144,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ): Promise<{ error: AuthError | null }> => {
     if (!supabase) return { error: null };
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
     return { error };
   };
 
@@ -151,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         loading,
+        isRecovery,
+        clearRecovery,
         signIn,
         signUp,
         signOut,
