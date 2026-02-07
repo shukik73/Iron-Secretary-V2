@@ -76,7 +76,7 @@ class ProactiveRuleEngine {
 
     for (const trigger of triggers) {
       const result = await trigger();
-      if (result && !this.hasRecentlyFired(result.id)) {
+      if (result && result.id && !this.hasRecentlyFired(result.id)) {
         return this.formatInterruption(result);
       }
     }

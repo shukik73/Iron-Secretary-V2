@@ -382,7 +382,7 @@ const WeeklyReview: React.FC = () => {
                       color: '#f3f4f6',
                       fontSize: '12px',
                     }}
-                    formatter={(value: number) => [`$${value}`, 'Revenue']}
+                    formatter={(value: number | undefined) => [`$${value ?? 0}`, 'Revenue']}
                     cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                   />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
