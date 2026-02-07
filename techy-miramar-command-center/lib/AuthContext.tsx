@@ -67,11 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearRecovery = () => setIsRecovery(false);
 
   useEffect(() => {
-    // If Supabase is not configured, fall back to a demo user so the app
-    // remains functional during local development.
+    // If Supabase is not configured, show the login page.
+    // The user signs in with any credentials (demo mode).
     if (!supabase) {
-      setUser(DEMO_USER);
-      setSession(DEMO_SESSION);
       setLoading(false);
       return;
     }
@@ -114,7 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
   ): Promise<{ error: AuthError | null }> => {
-    if (!supabase) return { error: null };
+    if (!supabase) {
+      // Demo mode: accept any credentials, log in as demo user with
+      // the provided email so the login page flow works normally.
+      const demoUser = {
+        ...DEMO_USER,
+        email,
+        user_metadata: { full_name: email.split('@')[0] },
+      } as User;
+      setUser(demoUser);
+      setSession({ ...DEMO_SESSION, user: demoUser } as Session);
+      return { error: null };
+    }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error };
@@ -136,7 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async (): Promise<void> => {
-    if (!supabase) return;
+    if (!supabase) {
+      setUser(null);
+      setSession(null);
+      return;
+    }
 
     await supabase.auth.signOut();
     setUser(null);
