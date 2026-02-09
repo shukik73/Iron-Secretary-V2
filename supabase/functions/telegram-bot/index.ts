@@ -8,6 +8,12 @@
  *   /today   — Today's tasks for all agents
  *   /tasks   — Filter tasks by project or assignee
  *   /nudge   — Manually trigger overdue check
+ *   /add     — Create a new task
+ *   /done    — Mark a task as completed
+ *   /assign  — Create and assign a task to an agent
+ *   /block   — Mark a task as blocked
+ *   /start   — Mark a task as in progress
+ *   /note    — Send a message to an agent
  *
  * Also exposes POST /notify for internal agents to send messages.
  *
@@ -263,12 +269,19 @@ async function handleHelp(chatId: number): Promise<void> {
   const msg = `<b>🤖 Jay — Iron Secretary PM</b>
 ━━━━━━━━━━━━━━━━━━━━━━
 
-<b>Commands</b>
+<b>📖 Read Commands</b>
   /status — System health across all projects
   /today — Today's tasks for all agents
-  /tasks — List recent tasks (filter: /tasks cc, /tasks pending)
-  /nudge — Check for overdue tasks, cold leads, stale sessions
-  /help — This message
+  /tasks — List tasks (filter: /tasks cc, /tasks pending)
+  /nudge — Check overdue tasks, cold leads, stale sessions
+
+<b>✏️ Write Commands</b>
+  /add — Create task: <code>/add [cc:high] Fix login</code>
+  /done — Complete task: <code>/done 3</code> or <code>/done deploy</code>
+  /start — Begin task: <code>/start 2</code>
+  /assign — Assign/reassign: <code>/assign cc Fix bug</code>
+  /block — Block task: <code>/block 3 Waiting on API key</code>
+  /note — Message agent: <code>/note cc Push the PR</code>
 
 <b>Notification Levels</b>
   🔴 Level 1 (Urgent) — Instant push
@@ -276,10 +289,252 @@ async function handleHelp(chatId: number): Promise<void> {
   🟢 Level 3 (Info) — Morning briefing only
 
 <b>Team</b>
-  👔 Shuki (CEO) · 🔨 CC (Builder)
-  📋 Jay (PM) · 🧠 Gemini (CTO) · 🎨 AG (Designer)`;
+  👔 Shuki · 🔨 CC · 📋 Jay · 🧠 Gemini · 🎨 AG`;
 
   await sendTelegram(chatId, msg);
+}
+
+// ── Write commands ───────────────────────────────────────────
+
+const VALID_AGENTS = ['shuki', 'cc', 'jay', 'gemini', 'ag'];
+
+async function findTaskByKeyword(keyword: string): Promise<any | null> {
+  // Try exact number match first (task index from /today listing)
+  const { data: tasks } = await supabase
+    .from('agent_tasks')
+    .select('*')
+    .in('status', ['pending', 'in_progress', 'review', 'blocked'])
+    .order('priority')
+    .order('due_date');
+
+  if (!tasks?.length) return null;
+
+  // If keyword is a number, use it as 1-based index
+  const index = parseInt(keyword);
+  if (!isNaN(index) && index >= 1 && index <= tasks.length) {
+    return tasks[index - 1];
+  }
+
+  // Otherwise search by title substring (case-insensitive)
+  const lower = keyword.toLowerCase();
+  return tasks.find(t => t.title.toLowerCase().includes(lower)) ?? null;
+}
+
+async function handleAdd(chatId: number, args: string): Promise<void> {
+  if (!args.trim()) {
+    await sendTelegram(chatId, `Usage:\n  <code>/add Deploy new feature</code>\n  <code>/add [cc] Fix the login bug</code>\n  <code>/add [gemini:high] Review security</code>\n\nFormat: /add [agent:priority] title`);
+    return;
+  }
+
+  // Parse optional [agent] or [agent:priority] prefix
+  let assignee = 'shuki';
+  let priority = 'medium';
+  let title = args.trim();
+
+  const bracketMatch = title.match(/^\[(\w+)(?::(\w+))?\]\s*(.+)$/);
+  if (bracketMatch) {
+    const parsedAgent = bracketMatch[1].toLowerCase();
+    const parsedPriority = bracketMatch[2]?.toLowerCase();
+    const parsedTitle = bracketMatch[3];
+
+    if (VALID_AGENTS.includes(parsedAgent)) {
+      assignee = parsedAgent;
+    }
+    if (parsedPriority && ['critical', 'high', 'medium', 'low'].includes(parsedPriority)) {
+      priority = parsedPriority;
+    }
+    title = parsedTitle;
+  }
+
+  const { data, error } = await supabase
+    .from('agent_tasks')
+    .insert({
+      title,
+      assignee,
+      priority,
+      status: 'pending',
+      created_by: 'jay',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to create task: ${error.message}`);
+    return;
+  }
+
+  await sendTelegram(chatId, `✅ Task created:\n\n  ${priorityEmoji(priority)} <b>${title}</b>\n  → ${agentEmoji(assignee)} ${agentLabel(assignee)} · ${priority}\n\nUse /today to see all tasks.`);
+}
+
+async function handleDone(chatId: number, args: string): Promise<void> {
+  if (!args.trim()) {
+    await sendTelegram(chatId, `Usage:\n  <code>/done Deploy migrations</code>\n  <code>/done 1</code> (task number from /today)\n\nMarks the matching task as completed.`);
+    return;
+  }
+
+  const task = await findTaskByKeyword(args.trim());
+  if (!task) {
+    await sendTelegram(chatId, `❌ No active task matching "${args.trim()}".\n\nUse /today to see task numbers.`);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'done', completed_at: new Date().toISOString() })
+    .eq('id', task.id);
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to update: ${error.message}`);
+    return;
+  }
+
+  await sendTelegram(chatId, `✅ Done: <b>${task.title}</b>\n  (was assigned to ${agentEmoji(task.assignee)} ${agentLabel(task.assignee)})`);
+}
+
+async function handleAssign(chatId: number, args: string): Promise<void> {
+  const parts = args.trim().split(/\s+/);
+  if (parts.length < 2) {
+    await sendTelegram(chatId, `Usage:\n  <code>/assign cc Fix the login bug</code>\n  <code>/assign gemini 3</code> (reassign task #3)\n\nAgents: shuki, cc, jay, gemini, ag`);
+    return;
+  }
+
+  const targetAgent = parts[0].toLowerCase();
+  if (!VALID_AGENTS.includes(targetAgent)) {
+    await sendTelegram(chatId, `❌ Unknown agent: "${parts[0]}"\n\nValid agents: ${VALID_AGENTS.join(', ')}`);
+    return;
+  }
+
+  const rest = parts.slice(1).join(' ');
+
+  // Check if it's a reassignment of existing task
+  const existingTask = await findTaskByKeyword(rest);
+  if (existingTask) {
+    const { error } = await supabase
+      .from('agent_tasks')
+      .update({ assignee: targetAgent })
+      .eq('id', existingTask.id);
+
+    if (error) {
+      await sendTelegram(chatId, `❌ Failed to reassign: ${error.message}`);
+      return;
+    }
+
+    await sendTelegram(chatId, `🔄 Reassigned: <b>${existingTask.title}</b>\n  → ${agentEmoji(targetAgent)} ${agentLabel(targetAgent)}`);
+
+    // Send a handoff message
+    await supabase.from('agent_messages').insert({
+      from_agent: 'jay',
+      to_agent: targetAgent,
+      message_type: 'handoff',
+      subject: `Task reassigned to you`,
+      body: `"${existingTask.title}" has been assigned to you by Shuki via Jay.`,
+    });
+    return;
+  }
+
+  // Otherwise create a new task
+  const { error } = await supabase
+    .from('agent_tasks')
+    .insert({
+      title: rest,
+      assignee: targetAgent,
+      priority: 'medium',
+      status: 'pending',
+      created_by: 'jay',
+    });
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to create task: ${error.message}`);
+    return;
+  }
+
+  await sendTelegram(chatId, `✅ New task assigned:\n\n  <b>${rest}</b>\n  → ${agentEmoji(targetAgent)} ${agentLabel(targetAgent)}`);
+}
+
+async function handleBlock(chatId: number, args: string): Promise<void> {
+  // Format: /block <keyword> <reason> or /block <number> <reason>
+  const parts = args.trim().split(/\s+/);
+  if (parts.length < 1 || !args.trim()) {
+    await sendTelegram(chatId, `Usage:\n  <code>/block 3 Waiting on API key</code>\n  <code>/block deploy Need Supabase access</code>\n\nMarks a task as blocked with a reason.`);
+    return;
+  }
+
+  // Try first word/number as task identifier
+  const task = await findTaskByKeyword(parts[0]);
+  if (!task) {
+    await sendTelegram(chatId, `❌ No active task matching "${parts[0]}".\n\nUse /today to see task numbers.`);
+    return;
+  }
+
+  const reason = parts.slice(1).join(' ') || 'No reason provided';
+
+  const { error } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'blocked', blocker_notes: reason })
+    .eq('id', task.id);
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to update: ${error.message}`);
+    return;
+  }
+
+  await sendTelegram(chatId, `🚫 Blocked: <b>${task.title}</b>\n  Reason: ${reason}\n  (${agentEmoji(task.assignee)} ${agentLabel(task.assignee)})`);
+}
+
+async function handleStart(chatId: number, args: string): Promise<void> {
+  if (!args.trim()) {
+    await sendTelegram(chatId, `Usage:\n  <code>/start 3</code>\n  <code>/start deploy</code>\n\nMarks a task as in progress.`);
+    return;
+  }
+
+  const task = await findTaskByKeyword(args.trim());
+  if (!task) {
+    await sendTelegram(chatId, `❌ No active task matching "${args.trim()}".\n\nUse /today to see task numbers.`);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('agent_tasks')
+    .update({ status: 'in_progress' })
+    .eq('id', task.id);
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to update: ${error.message}`);
+    return;
+  }
+
+  await sendTelegram(chatId, `🔵 Started: <b>${task.title}</b>\n  → ${agentEmoji(task.assignee)} ${agentLabel(task.assignee)}`);
+}
+
+async function handleNote(chatId: number, args: string): Promise<void> {
+  const parts = args.trim().split(/\s+/);
+  if (parts.length < 2) {
+    await sendTelegram(chatId, `Usage:\n  <code>/note cc Hey, push the PR when ready</code>\n  <code>/note gemini Please review the migration</code>\n  <code>/note all Standup at 10am</code>\n\nSends a message to an agent (visible in Command Center).`);
+    return;
+  }
+
+  const targetAgent = parts[0].toLowerCase();
+  if (!VALID_AGENTS.includes(targetAgent) && targetAgent !== 'all') {
+    await sendTelegram(chatId, `❌ Unknown agent: "${parts[0]}"\n\nValid targets: ${VALID_AGENTS.join(', ')}, all`);
+    return;
+  }
+
+  const body = parts.slice(1).join(' ');
+
+  const { error } = await supabase.from('agent_messages').insert({
+    from_agent: 'shuki',
+    to_agent: targetAgent,
+    message_type: 'nudge',
+    body,
+  });
+
+  if (error) {
+    await sendTelegram(chatId, `❌ Failed to send: ${error.message}`);
+    return;
+  }
+
+  const target = targetAgent === 'all' ? '📢 All agents' : `${agentEmoji(targetAgent)} ${agentLabel(targetAgent)}`;
+  await sendTelegram(chatId, `💬 Message sent to ${target}:\n  "${body}"`);
 }
 
 // ── Internal notify endpoint ─────────────────────────────────
@@ -387,7 +642,9 @@ serve(async (req) => {
       const [command, ...argParts] = text.split(' ');
       const args = argParts.join(' ');
 
-      switch (command.toLowerCase().replace(/@.*$/, '')) {
+      const cmd = command.toLowerCase().replace(/@.*$/, '');
+      switch (cmd) {
+        // Read commands
         case '/status':
           await handleStatus(chatId);
           break;
@@ -401,8 +658,26 @@ serve(async (req) => {
           await handleNudge(chatId);
           break;
         case '/help':
-        case '/start':
           await handleHelp(chatId);
+          break;
+        // Write commands
+        case '/add':
+          await handleAdd(chatId, args);
+          break;
+        case '/done':
+          await handleDone(chatId, args);
+          break;
+        case '/start':
+          await handleStart(chatId, args);
+          break;
+        case '/assign':
+          await handleAssign(chatId, args);
+          break;
+        case '/block':
+          await handleBlock(chatId, args);
+          break;
+        case '/note':
+          await handleNote(chatId, args);
           break;
         default:
           // Unknown command — Jay acknowledges but doesn't spam
