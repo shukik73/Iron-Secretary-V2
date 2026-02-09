@@ -21,6 +21,7 @@ import {
   CheckSquare,
   BarChart3,
   LogOut,
+  Radio,
 } from 'lucide-react';
 import { useTheme } from '../lib/ThemeContext';
 
@@ -40,6 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
   const navItems = [
     { section: 'Focus', items: [
       { id: 'dashboard', label: 'My Focus', icon: LayoutGrid },
+      { id: 'command-center', label: 'Command Center', icon: Radio },
       { id: 'morning-briefing', label: 'Morning Briefing', icon: Sunrise },
       { id: 'smart-today', label: 'Today', icon: CheckSquare },
       { id: 'timeline', label: 'Schedule', icon: CalendarDays },
