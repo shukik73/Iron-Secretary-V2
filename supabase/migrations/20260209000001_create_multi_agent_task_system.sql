@@ -14,6 +14,7 @@
 -- ============================================================
 
 -- ── PROJECTS ─────────────────────────────────────────────────
+
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS projects (
 
 -- ── AGENT_TASKS ──────────────────────────────────────────────
 -- The shared To-Do list. Every agent checks this before working.
+
 CREATE TABLE IF NOT EXISTS agent_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS agent_tasks (
 
 -- ── AGENT_CONTEXT ────────────────────────────────────────────
 -- The "Occupied" sign. Before modifying a file, check here first.
+
 CREATE TABLE IF NOT EXISTS agent_context (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS agent_context (
 
 -- ── AGENT_MESSAGES ───────────────────────────────────────────
 -- Cross-agent communication: handoffs, nudges, conflict alerts.
+
 CREATE TABLE IF NOT EXISTS agent_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
@@ -98,6 +102,7 @@ CREATE TABLE IF NOT EXISTS agent_messages (
 
 -- ── AUDIT_LOGS ───────────────────────────────────────────────
 -- The "Black Box." Every task change is recorded with before/after.
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
@@ -150,6 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_agent ON audit_logs(agent_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC);
 
 -- ── ROW LEVEL SECURITY ───────────────────────────────────────
+
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_context ENABLE ROW LEVEL SECURITY;
@@ -174,6 +180,7 @@ END $$;
 
 -- ── UPDATED_AT TRIGGERS ─────────────────────────────────────
 -- (reuses update_updated_at_column() from migration 0004)
+
 CREATE TRIGGER update_projects_updated_at
   BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -182,6 +189,7 @@ CREATE TRIGGER update_agent_tasks_updated_at
 
 -- ── AUDIT LOG TRIGGER ────────────────────────────────────────
 -- Automatically records every change to agent_tasks.
+
 CREATE OR REPLACE FUNCTION log_agent_task_changes()
 RETURNS TRIGGER AS $$
 DECLARE

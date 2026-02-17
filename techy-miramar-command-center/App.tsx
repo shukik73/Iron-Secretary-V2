@@ -21,6 +21,7 @@ import WeeklyReview from './pages/WeeklyReview';
 import SmartToday from './pages/SmartToday';
 import TimelineCalendar from './pages/TimelineCalendar';
 import ReviewGuard from './pages/ReviewGuard';
+import CommandCenter from './pages/CommandCenter';
 
 function App() {
   const { user, loading, isRecovery, clearRecovery, signIn, signUp, signOut, resetPassword, updatePassword } = useAuth();
@@ -65,6 +66,7 @@ function App() {
   const renderContent = () => {
     switch(activeTab) {
       case 'dashboard': return <Dashboard />;
+      case 'command-center': return <CommandCenter />;
       case 'morning-briefing': return <MorningBriefing />;
       case 'smart-today': return <SmartToday />;
       case 'timeline': return <TimelineCalendar />;

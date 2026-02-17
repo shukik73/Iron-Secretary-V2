@@ -33,6 +33,7 @@ const supabase = createClient(
 );
 
 // ── Telegram sender ──────────────────────────────────────────
+
 async function sendTelegram(chatId: number | bigint, text: string): Promise<boolean> {
   if (!TELEGRAM_BOT_TOKEN) return false;
   const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
@@ -58,6 +59,7 @@ async function getAllChatIds(): Promise<number[]> {
 
 // ── Job: Lead Check ──────────────────────────────────────────
 // Level 1 (urgent) if lead is >2 hours old and untouched.
+
 async function leadCheck(): Promise<string> {
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
@@ -84,11 +86,13 @@ async function leadCheck(): Promise<string> {
   for (const chatId of chatIds) {
     await sendTelegram(chatId, msg);
   }
+
   return `Notified about ${coldLeads.length} cold leads.`;
 }
 
 // ── Job: Dev Check ───────────────────────────────────────────
 // Level 2 (status) if an agent has been writing for >2 hours without update.
+
 async function devCheck(): Promise<string> {
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
@@ -111,11 +115,13 @@ async function devCheck(): Promise<string> {
   }));
 
   await supabase.from('notification_queue').insert(notifications);
+
   return `Queued ${stale.length} stale session alerts.`;
 }
 
 // ── Job: Flush Batch (Level 2) ───────────────────────────────
 // Sends all queued Level 2 notifications as a single digest.
+
 async function flushBatch(): Promise<string> {
   const { data: pending } = await supabase
     .from('notification_queue')
@@ -150,6 +156,7 @@ async function flushBatch(): Promise<string> {
 
 // ── Job: Morning Briefing ────────────────────────────────────
 // Daily at 7am. Summarizes what's ahead.
+
 async function morningBriefing(): Promise<string> {
   const now = new Date();
   const todayEnd = new Date(now);
@@ -226,6 +233,7 @@ async function morningBriefing(): Promise<string> {
 
 // ── Job: Evening Recap ───────────────────────────────────────
 // Daily at 6pm. What got done, what didn't.
+
 async function eveningRecap(): Promise<string> {
   const now = new Date();
   const todayStart = new Date(now);
@@ -280,6 +288,7 @@ async function eveningRecap(): Promise<string> {
 }
 
 // ── Main handler ─────────────────────────────────────────────
+
 serve(async (req) => {
   try {
     if (req.method !== 'POST') {

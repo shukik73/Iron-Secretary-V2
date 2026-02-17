@@ -61,11 +61,13 @@ function hasValidTelegramSecret(req: Request): boolean {
 }
 
 // ── Telegram API helpers ─────────────────────────────────────
+
 async function sendTelegram(chatId: number | bigint, text: string): Promise<boolean> {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error('TELEGRAM_BOT_TOKEN not set');
     return false;
   }
+
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const res = await fetch(url, {
     method: 'POST',
@@ -77,6 +79,7 @@ async function sendTelegram(chatId: number | bigint, text: string): Promise<bool
       disable_web_page_preview: true,
     }),
   });
+
   if (!res.ok) {
     console.error('Telegram send failed:', await res.text());
   }
@@ -84,10 +87,12 @@ async function sendTelegram(chatId: number | bigint, text: string): Promise<bool
 }
 
 // ── Command handlers ─────────────────────────────────────────
+
 async function handleStatus(chatId: number): Promise<void> {
   const { data: projects } = await supabase
     .from('projects')
     .select('name, slug, status');
+
   const { data: tasks } = await supabase
     .from('agent_tasks')
     .select('assignee, status, priority, due_date, project_id');
@@ -160,7 +165,7 @@ async function handleToday(chatId: number): Promise<void> {
     return d >= todayStart && d <= todayEnd;
   });
   const upcoming = tasks.filter(t => {
-    if (!t.due_date) return true;
+    if (!t.due_date) return true; // no date = still active
     return new Date(t.due_date) > todayEnd;
   });
 
@@ -170,10 +175,12 @@ async function handleToday(chatId: number): Promise<void> {
     msg += `\n🚨 <b>OVERDUE</b>\n`;
     msg += overdue.map(t => formatTask(t)).join('\n');
   }
+
   if (dueToday.length > 0) {
     msg += `\n\n📌 <b>DUE TODAY</b>\n`;
     msg += dueToday.map(t => formatTask(t)).join('\n');
   }
+
   if (upcoming.length > 0) {
     msg += `\n\n📋 <b>UPCOMING</b>\n`;
     msg += upcoming.slice(0, 10).map(t => formatTask(t)).join('\n');
@@ -194,17 +201,20 @@ async function handleTasks(chatId: number, args: string): Promise<void> {
     .order('created_at', { ascending: false })
     .limit(15);
 
+  // Filter by assignee
   const agents = ['shuki', 'cc', 'jay', 'gemini', 'ag'];
   if (agents.includes(filter)) {
     query = query.eq('assignee', filter);
   }
 
+  // Filter by status
   const statuses = ['pending', 'in_progress', 'review', 'done', 'blocked'];
   if (statuses.includes(filter)) {
     query = query.eq('status', filter);
   }
 
   const { data: tasks } = await query;
+
   if (!tasks?.length) {
     await sendTelegram(chatId, `📭 No tasks found${filter ? ` for "${filter}"` : ''}.\n\nTry: /tasks cc, /tasks pending, or /tasks done`);
     return;
@@ -212,6 +222,7 @@ async function handleTasks(chatId: number, args: string): Promise<void> {
 
   const msg = `<b>📋 Tasks${filter ? ` (${filter})` : ''}</b>\n━━━━━━━━━━━━━━━━━━━━━━\n\n` +
     tasks.map(t => formatTask(t)).join('\n');
+
   await sendTelegram(chatId, msg);
 }
 
@@ -219,6 +230,7 @@ async function handleNudge(chatId: number): Promise<void> {
   const now = new Date();
   const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
+  // Check overdue tasks
   const { data: overdue } = await supabase
     .from('agent_tasks')
     .select('title, assignee, due_date, priority')
@@ -226,12 +238,14 @@ async function handleNudge(chatId: number): Promise<void> {
     .in('status', ['pending', 'in_progress'])
     .order('due_date');
 
+  // Check stale agent context (writing for >2 hours)
   const { data: staleAgents } = await supabase
     .from('agent_context')
     .select('agent_id, current_file_path, action_type, heartbeat')
     .lt('heartbeat', twoHoursAgo.toISOString())
     .is('ended_at', null);
 
+  // Check cold leads (new leads not touched in 2+ hours)
   const { data: coldLeads } = await supabase
     .from('leads')
     .select('name, device_type, created_at')
@@ -299,10 +313,12 @@ async function handleHelp(chatId: number): Promise<void> {
 
 <b>Team</b>
   👔 Shuki · 🔨 CC · 📋 Jay · 🧠 Gemini · 🎨 AG`;
+
   await sendTelegram(chatId, msg);
 }
 
 // ── Write commands ───────────────────────────────────────────
+
 const VALID_AGENTS = ['shuki', 'cc', 'jay', 'gemini', 'ag'];
 
 async function findTaskByKeyword(keyword: string): Promise<any | null> {
@@ -315,11 +331,13 @@ async function findTaskByKeyword(keyword: string): Promise<any | null> {
 
   if (!tasks?.length) return null;
 
+  // If keyword is a number, use it as 1-based index
   const index = parseInt(keyword);
   if (!isNaN(index) && index >= 1 && index <= tasks.length) {
     return tasks[index - 1];
   }
 
+  // Otherwise search by title substring (case-insensitive)
   const lower = keyword.toLowerCase();
   return tasks.find(t => t.title.toLowerCase().includes(lower)) ?? null;
 }
@@ -330,6 +348,7 @@ async function handleAdd(chatId: number, args: string): Promise<void> {
     return;
   }
 
+  // Parse optional [agent] or [agent:priority] prefix
   let assignee = 'shuki';
   let priority = 'medium';
   let title = args.trim();
@@ -408,6 +427,8 @@ async function handleAssign(chatId: number, args: string): Promise<void> {
   }
 
   const rest = parts.slice(1).join(' ');
+
+  // Check if it's a reassignment of existing task
   const existingTask = await findTaskByKeyword(rest);
 
   if (existingTask) {
@@ -423,6 +444,7 @@ async function handleAssign(chatId: number, args: string): Promise<void> {
 
     await sendTelegram(chatId, `🔄 Reassigned: <b>${existingTask.title}</b>\n  → ${agentEmoji(targetAgent)} ${agentLabel(targetAgent)}`);
 
+    // Send a handoff message
     await supabase.from('agent_messages').insert({
       from_agent: 'jay',
       to_agent: targetAgent,
@@ -433,6 +455,7 @@ async function handleAssign(chatId: number, args: string): Promise<void> {
     return;
   }
 
+  // Otherwise create a new task
   const { error } = await supabase
     .from('agent_tasks')
     .insert({
@@ -465,6 +488,7 @@ async function handleBlock(chatId: number, args: string): Promise<void> {
   }
 
   const reason = parts.slice(1).join(' ') || 'No reason provided';
+
   const { error } = await supabase
     .from('agent_tasks')
     .update({ status: 'blocked', blocker_notes: reason })
@@ -517,6 +541,7 @@ async function handleNote(chatId: number, args: string): Promise<void> {
   }
 
   const body = parts.slice(1).join(' ');
+
   const { error } = await supabase.from('agent_messages').insert({
     from_agent: 'shuki',
     to_agent: targetAgent,
@@ -534,6 +559,8 @@ async function handleNote(chatId: number, args: string): Promise<void> {
 }
 
 // ── Internal notify endpoint ─────────────────────────────────
+// Other edge functions or cron jobs call this to send notifications.
+
 async function handleNotify(req: Request): Promise<Response> {
   const { chat_id, message, level = 1 } = await req.json();
 
@@ -545,6 +572,7 @@ async function handleNotify(req: Request): Promise<Response> {
   }
 
   if (level === 1) {
+    // Urgent — send immediately
     const sent = await sendTelegram(chat_id, message);
     return new Response(
       JSON.stringify({ sent }),
@@ -552,6 +580,7 @@ async function handleNotify(req: Request): Promise<Response> {
     );
   }
 
+  // Level 2/3 — queue for batch delivery
   const { error } = await supabase.from('notification_queue').insert({
     channel: 'telegram',
     level,
@@ -567,6 +596,7 @@ async function handleNotify(req: Request): Promise<Response> {
 }
 
 // ── Formatting helpers ───────────────────────────────────────
+
 function formatTask(t: any): string {
   const status = statusEmoji(t.status);
   const priority = priorityEmoji(t.priority);
@@ -607,6 +637,7 @@ function agentLabel(agent: string): string {
 }
 
 // ── Main handler ─────────────────────────────────────────────
+
 serve(async (req) => {
   try {
     const url = new URL(req.url);
@@ -647,6 +678,7 @@ serve(async (req) => {
 
       const body = await req.json();
       const message = body.message;
+
       if (!message?.text || !message?.chat?.id) {
         return new Response('ok');
       }
@@ -654,11 +686,13 @@ serve(async (req) => {
       const chatId = message.chat.id;
       const text = message.text.trim();
 
+      // Parse command and arguments
       const [command, ...argParts] = text.split(' ');
       const args = argParts.join(' ');
       const cmd = command.toLowerCase().replace(/@.*$/, '');
 
       switch (cmd) {
+        // Read commands
         case '/status':
           await handleStatus(chatId);
           break;
@@ -674,6 +708,7 @@ serve(async (req) => {
         case '/help':
           await handleHelp(chatId);
           break;
+        // Write commands
         case '/add':
           await handleAdd(chatId, args);
           break;
@@ -693,11 +728,13 @@ serve(async (req) => {
           await handleNote(chatId, args);
           break;
         default:
+          // Unknown command — Jay acknowledges but doesn't spam
           if (text.startsWith('/')) {
             await sendTelegram(chatId, `Unknown command: ${command}\nUse /help to see available commands.`);
           }
           break;
       }
+
       return new Response('ok');
     }
 
