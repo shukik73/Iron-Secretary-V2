@@ -7,7 +7,7 @@
  * CRITICAL: Iron MUST remain silent unless a trigger fires.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getProactiveEngine, type Interruption, type EvaluationContext } from './proactiveRuleEngine';
 import { audioFeedback } from './audioFeedback';
 import { supabase } from './supabase';
@@ -27,13 +27,13 @@ class ProactiveSpeechController {
   startMonitoring(): void {
     if (this.evaluationInterval) return;
 
-    this.evaluationInterval = setInterval(async () => {
+    this.evaluationInterval = setInterval(() => {
       if (!this.isEnabled) return;
-      await this.evaluateInterruptions();
+      void this.evaluateInterruptions().catch(() => {});
     }, 60_000);
 
     // Initial evaluation
-    this.evaluateInterruptions();
+    void this.evaluateInterruptions().catch(() => {});
   }
 
   stopMonitoring(): void {
@@ -251,11 +251,29 @@ export function useProactiveSpeech(userId: string | null) {
     };
   }, [userId]);
 
+  const checkRealTimeEvent = useCallback(async (event: Record<string, any>) => {
+    if (!controller) return null;
+    const interruption = await controller.checkRealTimeEvent(event);
+    if (interruption) setLastInterruption(interruption);
+    return interruption;
+  }, [controller]);
+
+  const handleUserCommand = useCallback(async (command: string) => {
+    if (!controller) return null;
+    const interruption = await controller.handleUserCommand(command);
+    if (interruption) setLastInterruption(interruption);
+    return interruption;
+  }, [controller]);
+
+  const handleResponse = useCallback((id: string, response: string) => {
+    return controller?.handleInterruptionResponse(id, response);
+  }, [controller]);
+
   return {
     controller,
     lastInterruption,
-    checkRealTimeEvent: (event: Record<string, any>) => controller?.checkRealTimeEvent(event) ?? null,
-    handleUserCommand: (command: string) => controller?.handleUserCommand(command) ?? null,
-    handleResponse: (id: string, response: string) => controller?.handleInterruptionResponse(id, response),
+    checkRealTimeEvent,
+    handleUserCommand,
+    handleResponse,
   };
 }

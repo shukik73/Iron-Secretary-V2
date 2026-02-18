@@ -21,6 +21,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+const supabaseAdmin = createClient(
+  SUPABASE_URL ?? 'http://localhost',
+  SUPABASE_SERVICE_ROLE_KEY ?? 'missing-service-role-key'
+);
+
 interface ParseResult {
   intent: string;
   entities: Record<string, any>;
@@ -30,8 +38,35 @@ interface ParseResult {
   clarificationQuestion?: string;
 }
 
-// ── Pattern matching fallback ───────────────────────────────
+async function requireAuth(req: Request): Promise<Response | null> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secret' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
+  const authorization = req.headers.get('authorization');
+  if (!authorization?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const token = authorization.slice('Bearer '.length);
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data.user) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return null;
+}
+
+// ── Pattern matching fallback ───────────────────────────────
 const PATTERNS: Array<{ regex: RegExp; intent: string; extract: (m: RegExpMatchArray) => Record<string, any> }> = [
   {
     regex: /(got|received|made)\s+(?:one\s+)?\$?(\d+(?:\.\d{2})?)\s*(?:in\s+)?tip/i,
@@ -89,7 +124,6 @@ function patternMatch(transcript: string): ParseResult | null {
 }
 
 // ── OpenAI parsing ──────────────────────────────────────────
-
 async function parseWithAI(transcript: string): Promise<ParseResult> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) {
@@ -110,7 +144,6 @@ async function parseWithAI(transcript: string): Promise<ParseResult> {
 - requiresConfirmation: true for money/messaging actions
 - requiresClarification: true if missing key info
 - clarificationQuestion: what to ask if unclear
-
 Return valid JSON only.`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -148,13 +181,22 @@ Return valid JSON only.`;
 }
 
 // ── Handler ─────────────────────────────────────────────────
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
   try {
+    const authError = await requireAuth(req);
+    if (authError) return authError;
+
     const { transcript } = await req.json();
 
     if (!transcript || typeof transcript !== 'string' || transcript.length > 1000) {

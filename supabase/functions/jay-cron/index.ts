@@ -15,15 +15,21 @@
  *
  * Required secrets:
  *   TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *
+ * Security:
+ *   Requires Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
  */
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  SUPABASE_URL ?? 'http://localhost',
+  SUPABASE_SERVICE_ROLE_KEY ?? 'missing-service-role-key'
 );
 
 // ── Telegram sender ──────────────────────────────────────────
@@ -292,7 +298,23 @@ serve(async (req) => {
       );
     }
 
-    const { job } = await req.json();
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secret' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = await req.json();
+    const job = typeof body?.job === 'string' ? body.job : '';
 
     let result: string;
     switch (job) {

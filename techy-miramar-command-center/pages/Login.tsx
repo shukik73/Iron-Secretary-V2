@@ -203,6 +203,7 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -222,18 +223,20 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
             </button>
 
             <div className="flex flex-col items-center gap-2 pt-2">
-              <span
+              <button
+                type="button"
                 onClick={() => switchView('forgot')}
                 className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
                 Forgot password?
-              </span>
-              <span
+              </button>
+              <button
+                type="button"
                 onClick={() => switchView('signup')}
                 className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
                 Don't have an account? <span className="text-white font-medium">Sign up</span>
-              </span>
+              </button>
             </div>
           </form>
         )}
@@ -279,6 +282,7 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -315,6 +319,7 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -334,12 +339,13 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
             </button>
 
             <div className="flex justify-center pt-2">
-              <span
+              <button
+                type="button"
                 onClick={() => switchView('login')}
                 className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
               >
                 Already have an account? <span className="text-white font-medium">Sign in</span>
-              </span>
+              </button>
             </div>
           </form>
         )}
@@ -350,12 +356,13 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
             <div className="text-sm text-emerald-400 bg-emerald-400/10 px-4 py-2 rounded-lg text-center">
               Check your email to confirm your account
             </div>
-            <span
+            <button
+              type="button"
               onClick={() => switchView('login')}
               className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer"
             >
               Back to sign in
-            </span>
+            </button>
           </div>
         )}
 
@@ -387,12 +394,13 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
             </button>
 
             <div className="flex justify-center pt-2">
-              <span
+              <button
+                type="button"
                 onClick={() => switchView('login')}
                 className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
               >
                 <ArrowLeft className="w-3 h-3" /> Back to sign in
-              </span>
+              </button>
             </div>
           </form>
         )}
@@ -404,12 +412,13 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
             <div className="text-sm text-emerald-400 bg-emerald-400/10 px-4 py-2 rounded-lg text-center">
               Check your email for a reset link
             </div>
-            <span
+            <button
+              type="button"
               onClick={() => switchView('login')}
               className="text-sm text-gray-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" /> Back to sign in
-            </span>
+            </button>
           </div>
         )}
 
@@ -430,6 +439,7 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -466,6 +476,7 @@ export default function Login({ onAuth, onSignIn, onSignUp, onResetPassword, onU
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
               >
                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

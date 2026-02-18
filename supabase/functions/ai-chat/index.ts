@@ -9,19 +9,62 @@
  */
 
 import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-4o-mini';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+const supabaseAdmin = createClient(
+  SUPABASE_URL ?? 'http://localhost',
+  SUPABASE_SERVICE_ROLE_KEY ?? 'missing-service-role-key'
+);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function requireAuth(req: Request): Promise<Response | null> {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(
+      JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secret' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const authorization = req.headers.get('authorization');
+  if (!authorization?.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const token = authorization.slice('Bearer '.length);
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data.user) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 
   if (!OPENAI_API_KEY) {
@@ -32,6 +75,9 @@ serve(async (req) => {
   }
 
   try {
+    const authError = await requireAuth(req);
+    if (authError) return authError;
+
     const { messages } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {

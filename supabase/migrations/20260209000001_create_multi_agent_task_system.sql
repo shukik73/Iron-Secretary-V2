@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL DEFAULT auth.uid(),
   name TEXT NOT NULL,
-  slug TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL,
   description TEXT,
   status TEXT DEFAULT 'active'
     CHECK (status IN ('active', 'paused', 'killed', 'completed')),
@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_user_slug_unique ON projects(user_id, slug);
 
 -- agent_tasks
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_user ON agent_tasks(user_id);
@@ -182,6 +183,7 @@ END $$;
 
 CREATE TRIGGER update_projects_updated_at
   BEFORE UPDATE ON projects FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_agent_tasks_updated_at
   BEFORE UPDATE ON agent_tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -231,18 +233,43 @@ CREATE TRIGGER audit_agent_tasks_changes
   FOR EACH ROW EXECUTE FUNCTION log_agent_task_changes();
 
 -- ── SEED: Default Projects ───────────────────────────────────
--- Pre-populate the three active projects so agents can reference them immediately.
-
-INSERT INTO projects (name, slug, description, status, revenue_target, kill_criteria)
-VALUES
-  ('Iron Secretary', 'iron-secretary',
-   'AI-powered command center for Techy Miramar operations',
-   'active', NULL, NULL),
-  ('ReviewGuard', 'reviewguard',
-   'SaaS - Automated Google review response platform',
-   'active', 2450.00,
-   '<5 customers after 20 demo calls by Week 8'),
-  ('LeadCatcher', 'leadcatcher',
-   'SaaS - Automated lead capture and follow-up for local businesses',
-   'active', NULL, NULL)
-ON CONFLICT (slug) DO NOTHING;
+-- Pre-populate default projects per existing user.
+-- In migration context auth.uid() is NULL, so user_id must be explicit.
+INSERT INTO projects (user_id, name, slug, description, status, revenue_target, kill_criteria)
+SELECT
+  u.id,
+  p.name,
+  p.slug,
+  p.description,
+  p.status,
+  p.revenue_target,
+  p.kill_criteria
+FROM auth.users u
+CROSS JOIN (
+  VALUES
+    (
+      'Iron Secretary',
+      'iron-secretary',
+      'AI-powered command center for Techy Miramar operations',
+      'active',
+      NULL::DECIMAL(10,2),
+      NULL::TEXT
+    ),
+    (
+      'ReviewGuard',
+      'reviewguard',
+      'SaaS - Automated Google review response platform',
+      'active',
+      2450.00::DECIMAL(10,2),
+      '<5 customers after 20 demo calls by Week 8'
+    ),
+    (
+      'LeadCatcher',
+      'leadcatcher',
+      'SaaS - Automated lead capture and follow-up for local businesses',
+      'active',
+      NULL::DECIMAL(10,2),
+      NULL::TEXT
+    )
+) AS p(name, slug, description, status, revenue_target, kill_criteria)
+ON CONFLICT (user_id, slug) DO NOTHING;

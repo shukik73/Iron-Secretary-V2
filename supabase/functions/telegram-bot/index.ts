@@ -19,6 +19,8 @@
  *
  * Required Supabase secrets:
  *   TELEGRAM_BOT_TOKEN  — From @BotFather
+ *   TELEGRAM_WEBHOOK_SECRET — Secret token configured when setting Telegram webhook
+ *   INTERNAL_API_SECRET — Shared secret for /notify (optional alternative to Bearer service-role auth)
  *   SUPABASE_URL        — Auto-set by Supabase
  *   SUPABASE_SERVICE_ROLE_KEY — Auto-set by Supabase
  */
@@ -27,10 +29,36 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const TELEGRAM_WEBHOOK_SECRET = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
+const INTERNAL_API_SECRET = Deno.env.get('INTERNAL_API_SECRET');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(
+  SUPABASE_URL ?? 'http://localhost',
+  SUPABASE_SERVICE_ROLE_KEY ?? 'missing-service-role-key'
+);
+
+function hasInternalAccess(req: Request): boolean {
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    return false;
+  }
+  const authorization = req.headers.get('authorization');
+  if (authorization === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
+    return true;
+  }
+  if (INTERNAL_API_SECRET) {
+    return req.headers.get('x-internal-secret') === INTERNAL_API_SECRET;
+  }
+  return false;
+}
+
+function hasValidTelegramSecret(req: Request): boolean {
+  if (!TELEGRAM_WEBHOOK_SECRET) {
+    return false;
+  }
+  return req.headers.get('x-telegram-bot-api-secret-token') === TELEGRAM_WEBHOOK_SECRET;
+}
 
 // ── Telegram API helpers ─────────────────────────────────────
 
@@ -87,10 +115,6 @@ async function handleStatus(chatId: number): Promise<void> {
 
   // Project summary
   const projectLines = (projects ?? []).map(p => {
-    const projectTasks = activeTasks.filter(t => {
-      // We'd need project_id mapping — for now show all
-      return true;
-    });
     const icon = p.status === 'active' ? '🟢' : p.status === 'paused' ? '🟡' : '🔴';
     return `  ${icon} ${p.name}`;
   }).join('\n');
@@ -122,7 +146,6 @@ async function handleToday(chatId: number): Promise<void> {
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  // Get all active tasks
   const { data: tasks } = await supabase
     .from('agent_tasks')
     .select('title, assignee, status, priority, due_date, blocker_notes')
@@ -299,7 +322,6 @@ async function handleHelp(chatId: number): Promise<void> {
 const VALID_AGENTS = ['shuki', 'cc', 'jay', 'gemini', 'ag'];
 
 async function findTaskByKeyword(keyword: string): Promise<any | null> {
-  // Try exact number match first (task index from /today listing)
   const { data: tasks } = await supabase
     .from('agent_tasks')
     .select('*')
@@ -408,6 +430,7 @@ async function handleAssign(chatId: number, args: string): Promise<void> {
 
   // Check if it's a reassignment of existing task
   const existingTask = await findTaskByKeyword(rest);
+
   if (existingTask) {
     const { error } = await supabase
       .from('agent_tasks')
@@ -452,14 +475,12 @@ async function handleAssign(chatId: number, args: string): Promise<void> {
 }
 
 async function handleBlock(chatId: number, args: string): Promise<void> {
-  // Format: /block <keyword> <reason> or /block <number> <reason>
   const parts = args.trim().split(/\s+/);
   if (parts.length < 1 || !args.trim()) {
     await sendTelegram(chatId, `Usage:\n  <code>/block 3 Waiting on API key</code>\n  <code>/block deploy Need Supabase access</code>\n\nMarks a task as blocked with a reason.`);
     return;
   }
 
-  // Try first word/number as task identifier
   const task = await findTaskByKeyword(parts[0]);
   if (!task) {
     await sendTelegram(chatId, `❌ No active task matching "${parts[0]}".\n\nUse /today to see task numbers.`);
@@ -621,13 +642,40 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
 
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(
+        JSON.stringify({ error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY secret' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Internal notify endpoint (called by other functions/cron)
     if (url.pathname.endsWith('/notify') && req.method === 'POST') {
+      if (!hasInternalAccess(req)) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
       return handleNotify(req);
     }
 
     // Telegram webhook (POST from Telegram servers)
     if (req.method === 'POST') {
+      if (!TELEGRAM_WEBHOOK_SECRET) {
+        return new Response(
+          JSON.stringify({ error: 'Missing TELEGRAM_WEBHOOK_SECRET' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (!hasValidTelegramSecret(req)) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
       const body = await req.json();
       const message = body.message;
 
@@ -641,8 +689,8 @@ serve(async (req) => {
       // Parse command and arguments
       const [command, ...argParts] = text.split(' ');
       const args = argParts.join(' ');
-
       const cmd = command.toLowerCase().replace(/@.*$/, '');
+
       switch (cmd) {
         // Read commands
         case '/status':
