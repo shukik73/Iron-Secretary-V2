@@ -352,11 +352,9 @@ const TimelineCalendar: React.FC = () => {
   };
 
   // ── Quick-add placeholder ──────────────────────────────────
-  const handleSlotClick = (hour: number, dateKey?: string) => {
+  const handleSlotClick = (_hour: number, _dateKey?: string) => {
     setSelectedEvent(null);
-    // In a real implementation this would open a creation modal.
-    // For now, we surface a console message to indicate the interaction works.
-    console.log(`Quick-add triggered: ${formatHour(hour)} on ${dateKey ?? selectedDateKey}`);
+    // TODO: open creation modal
   };
 
   // ── Render helpers ─────────────────────────────────────────

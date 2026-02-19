@@ -21,7 +21,7 @@ const supabaseAdmin = createClient(
 );
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
@@ -112,8 +112,9 @@ serve(async (req) => {
 
     if (!openaiResponse.ok) {
       const errorText = await openaiResponse.text();
+      console.error('Vision API error:', openaiResponse.status, errorText);
       return new Response(
-        JSON.stringify({ error: `Vision API error: ${openaiResponse.status}`, details: errorText }),
+        JSON.stringify({ error: `Vision API error: ${openaiResponse.status}` }),
         { status: openaiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -126,8 +127,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
+    console.error('ocr-extract error:', err);
     return new Response(
-      JSON.stringify({ error: 'Internal error', details: String(err) }),
+      JSON.stringify({ error: 'Internal error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

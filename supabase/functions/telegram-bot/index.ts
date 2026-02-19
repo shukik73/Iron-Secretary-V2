@@ -60,6 +60,18 @@ function hasValidTelegramSecret(req: Request): boolean {
   return req.headers.get('x-telegram-bot-api-secret-token') === TELEGRAM_WEBHOOK_SECRET;
 }
 
+// ── Chat authorization ───────────────────────────────────────
+
+async function isAuthorizedChat(chatId: number): Promise<boolean> {
+  const { data } = await supabase
+    .from('telegram_config')
+    .select('id')
+    .eq('chat_id', chatId)
+    .eq('bot_enabled', true)
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
 // ── Telegram API helpers ─────────────────────────────────────
 
 async function sendTelegram(chatId: number | bigint, text: string): Promise<boolean> {
@@ -684,6 +696,13 @@ serve(async (req) => {
       }
 
       const chatId = message.chat.id;
+
+      // Verify chat is registered and enabled before processing any command
+      if (!(await isAuthorizedChat(chatId))) {
+        console.warn(`Unauthorized chat_id attempted command: ${chatId}`);
+        return new Response('ok');
+      }
+
       const text = message.text.trim();
 
       // Parse command and arguments
