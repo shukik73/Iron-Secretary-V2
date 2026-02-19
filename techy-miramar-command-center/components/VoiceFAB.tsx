@@ -17,17 +17,19 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const stateRef = useRef(state);
   const transcriptRef = useRef(transcript);
+  const conversationHistoryRef = useRef<ChatMessage[]>([]);
 
   // Keep refs in sync to avoid stale closures in speech callbacks
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
+  useEffect(() => { conversationHistoryRef.current = conversationHistory; }, [conversationHistory]);
 
   const processCommand = useCallback(async (text: string) => {
     setState('processing');
 
-    // Build conversation with the new user message
+    // Build conversation with the new user message (use ref to avoid stale closure)
     const newMessages: ChatMessage[] = [
-      ...conversationHistory,
+      ...conversationHistoryRef.current,
       { role: 'user', content: text },
     ];
 
@@ -54,7 +56,7 @@ const VoiceFAB: React.FC<VoiceFABProps> = ({ onNavigateToVoice }) => {
       setState('error');
       setResponse('Failed to get AI response. Please try again.');
     }
-  }, [conversationHistory]);
+  }, []);
 
   const startListening = useCallback(() => {
     setModalOpen(true);

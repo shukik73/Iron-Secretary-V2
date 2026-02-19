@@ -29,8 +29,8 @@ function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
-  const handleCapture = useCallback((text: string, type: string) => {
-    console.log(`[QuickCapture] ${type}: ${text}`);
+  const handleCapture = useCallback((_text: string, _type: string) => {
+    // TODO: wire up to task creation API
   }, []);
 
   // Show loading spinner while checking session

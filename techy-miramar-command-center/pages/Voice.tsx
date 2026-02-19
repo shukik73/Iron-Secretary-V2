@@ -56,6 +56,10 @@ const Voice: React.FC = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
+  const chatHistoryRef = useRef<ChatMessage[]>([]);
+
+  // Keep ref in sync to avoid stale closures in async callbacks
+  useEffect(() => { chatHistoryRef.current = chatHistory; }, [chatHistory]);
 
   // Auto-scroll conversation
   useEffect(() => {
@@ -74,9 +78,9 @@ const Voice: React.FC = () => {
     };
     setConversation(prev => [...prev, userMsg]);
 
-    // Build messages for AI
+    // Build messages for AI (use ref to avoid stale closure)
     const newMessages: ChatMessage[] = [
-      ...chatHistory,
+      ...chatHistoryRef.current,
       { role: 'user', content: text },
     ];
 
@@ -121,7 +125,7 @@ const Voice: React.FC = () => {
       setIsProcessing(false);
       setResponse('Failed to get AI response. Please try again.');
     }
-  }, [chatHistory]);
+  }, []);
 
   const startListening = useCallback(() => {
     const SpeechRecognitionApi = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

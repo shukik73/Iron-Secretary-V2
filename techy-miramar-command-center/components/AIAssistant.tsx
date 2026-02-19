@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, X, Bot, CheckCircle2 } from 'lucide-react';
 
 interface AIAssistantProps {
@@ -13,12 +13,20 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ isOpen, onClose }) => {
     { id: 3, sender: 'ai', text: 'Done. Updated maxBuy for macbook_pro_15_2015 to $150. Anything else?' },
   ]);
   const [input, setInput] = useState('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up pending timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handleSend = () => {
     if (!input.trim()) return;
-    setMessages([...messages, { id: Date.now(), sender: 'user', text: input }]);
+    setMessages(prev => [...prev, { id: Date.now(), sender: 'user', text: input }]);
     setInput('');
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
         setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', text: 'I\'ve added that to your task list and prioritized it.' }]);
     }, 1000);
   };
