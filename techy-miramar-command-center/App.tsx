@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Bot, Loader2 } from 'lucide-react';
 import { useAuth } from './lib/AuthContext';
+import { supabase } from './lib/supabase';
+import type { CaptureResult } from './components/QuickCapture';
 import Sidebar from './components/Sidebar';
 import AIAssistant from './components/AIAssistant';
 import VoiceFAB from './components/VoiceFAB';
@@ -29,8 +31,22 @@ function App() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAIOpen, setIsAIOpen] = useState(false);
 
-  const handleCapture = useCallback((_text: string, _type: string) => {
-    // TODO: wire up to task creation API
+  const handleCapture = useCallback(async (text: string, _localType: string): Promise<CaptureResult> => {
+    if (!supabase) {
+      return { ok: false, error: 'offline' };
+    }
+    const { data, error } = await supabase.functions.invoke('quick-capture', {
+      body: { text, source: 'web' },
+    });
+    if (error) {
+      return { ok: false, error: error.message };
+    }
+    return {
+      ok: true,
+      captureId: data?.capture_id,
+      taskId: data?.task_id,
+      captureType: data?.capture_type,
+    };
   }, []);
 
   // Show loading spinner while checking session
