@@ -11,7 +11,7 @@
 
 set -e
 
-PROJECT_REF="djusjenyxujukdydhajp"
+PROJECT_REF="gwcdwkpjxzikiugsbrnv"
 SUPABASE_URL="https://${PROJECT_REF}.supabase.co"
 
 echo ""
