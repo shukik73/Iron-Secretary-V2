@@ -11,17 +11,32 @@ import {
   X,
   Command,
   Sparkles,
+  Check,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
+
+type CaptureStatus = 'pending' | 'sent' | 'failed' | 'offline';
+
+export interface CaptureResult {
+  ok: boolean;
+  error?: string;
+  captureId?: string;
+  taskId?: string;
+  captureType?: string;
+}
 
 interface CaptureEntry {
   id: number;
   text: string;
   type: string;
   timestamp: Date;
+  status: CaptureStatus;
+  errorMessage?: string;
 }
 
 interface QuickCaptureProps {
-  onCapture: (text: string, type: string) => void;
+  onCapture: (text: string, type: string) => void | Promise<CaptureResult | void>;
   isVisible?: boolean;
 }
 
@@ -64,11 +79,11 @@ function formatRelativeTime(date: Date): string {
 }
 
 const INITIAL_CAPTURES: CaptureEntry[] = [
-  { id: 1, text: 'Got $25 tip from iPad repair',             type: 'tip',      timestamp: new Date(Date.now() - 12 * 60000) },
-  { id: 2, text: 'Remind me to order iPhone 14 screens',     type: 'reminder', timestamp: new Date(Date.now() - 45 * 60000) },
-  { id: 3, text: 'Task: update Midas buy rules for MacBooks', type: 'task',     timestamp: new Date(Date.now() - 2 * 3600000) },
-  { id: 4, text: 'Search leads for Samsung Galaxy S24',      type: 'search',   timestamp: new Date(Date.now() - 4 * 3600000) },
-  { id: 5, text: 'Customer wants a quote on water damage fix', type: 'note',    timestamp: new Date(Date.now() - 6 * 3600000) },
+  { id: 1, text: 'Got $25 tip from iPad repair',             type: 'tip',      timestamp: new Date(Date.now() - 12 * 60000),     status: 'sent' },
+  { id: 2, text: 'Remind me to order iPhone 14 screens',     type: 'reminder', timestamp: new Date(Date.now() - 45 * 60000),     status: 'sent' },
+  { id: 3, text: 'Task: update Midas buy rules for MacBooks', type: 'task',     timestamp: new Date(Date.now() - 2 * 3600000),    status: 'sent' },
+  { id: 4, text: 'Search leads for Samsung Galaxy S24',      type: 'search',   timestamp: new Date(Date.now() - 4 * 3600000),    status: 'sent' },
+  { id: 5, text: 'Customer wants a quote on water damage fix', type: 'note',    timestamp: new Date(Date.now() - 6 * 3600000),    status: 'sent' },
 ];
 
 const QuickCapture: React.FC<QuickCaptureProps> = ({ onCapture, isVisible = true }) => {
@@ -76,6 +91,7 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ onCapture, isVisible = true
   const [captures, setCaptures] = useState<CaptureEntry[]>(INITIAL_CAPTURES);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const detectedType = input.trim() ? detectType(input) : null;
@@ -86,18 +102,71 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ onCapture, isVisible = true
     if (!text) return;
 
     const type = overrideType || detectType(text);
+    const entryId = Date.now();
     const entry: CaptureEntry = {
-      id: Date.now(),
+      id: entryId,
       text,
       type,
       timestamp: new Date(),
+      status: 'pending',
     };
 
     setCaptures(prev => [entry, ...prev].slice(0, 20));
-    onCapture(text, type);
     setInput('');
     inputRef.current?.focus();
+
+    const result = onCapture(text, type);
+    Promise.resolve(result).then((res) => {
+      if (!res || typeof res !== 'object' || !('ok' in res)) {
+        setCaptures(prev => prev.map(c => c.id === entryId ? { ...c, status: 'sent' } : c));
+        return;
+      }
+      if (res.ok) {
+        setCaptures(prev => prev.map(c => c.id === entryId
+          ? { ...c, status: 'sent', type: res.captureType ?? c.type }
+          : c
+        ));
+      } else if (res.error === 'offline') {
+        setCaptures(prev => prev.map(c => c.id === entryId
+          ? { ...c, status: 'offline', errorMessage: res.error }
+          : c
+        ));
+        setToast('Supabase not connected — capture kept locally.');
+        setTimeout(() => setToast(null), 4000);
+      } else {
+        setCaptures(prev => prev.map(c => c.id === entryId
+          ? { ...c, status: 'failed', errorMessage: res.error }
+          : c
+        ));
+        setInput(text);
+      }
+    }).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setCaptures(prev => prev.map(c => c.id === entryId
+        ? { ...c, status: 'failed', errorMessage: message }
+        : c
+      ));
+      setInput(text);
+    });
   }, [input, onCapture]);
+
+  const retryCapture = useCallback((id: number) => {
+    const entry = captures.find(c => c.id === id);
+    if (!entry) return;
+    setCaptures(prev => prev.map(c => c.id === id ? { ...c, status: 'pending' } : c));
+    const result = onCapture(entry.text, entry.type);
+    Promise.resolve(result).then((res) => {
+      if (!res || typeof res !== 'object' || !('ok' in res)) {
+        setCaptures(prev => prev.map(c => c.id === id ? { ...c, status: 'sent' } : c));
+        return;
+      }
+      if (res.ok) {
+        setCaptures(prev => prev.map(c => c.id === id ? { ...c, status: 'sent' } : c));
+      } else {
+        setCaptures(prev => prev.map(c => c.id === id ? { ...c, status: 'failed', errorMessage: res.error } : c));
+      }
+    });
+  }, [captures, onCapture]);
 
   const handleQuickAction = useCallback((type: CaptureType) => {
     if (input.trim()) {
@@ -166,6 +235,30 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ onCapture, isVisible = true
                       <Icon size={12} className={cfg.color} />
                     </div>
                     <span className="flex-1 text-sm text-gray-300 truncate">{entry.text}</span>
+                    <span
+                      className="shrink-0 flex items-center"
+                      title={entry.errorMessage ?? entry.status}
+                      aria-label={`Capture status: ${entry.status}`}
+                    >
+                      {entry.status === 'pending' && (
+                        <Loader2 size={12} className="text-amber-400 animate-spin" />
+                      )}
+                      {entry.status === 'sent' && (
+                        <Check size={12} className="text-emerald-400" />
+                      )}
+                      {entry.status === 'failed' && (
+                        <button
+                          onClick={() => retryCapture(entry.id)}
+                          className="text-red-400 hover:text-red-300"
+                          aria-label="Retry failed capture"
+                        >
+                          <AlertCircle size={12} />
+                        </button>
+                      )}
+                      {entry.status === 'offline' && (
+                        <AlertCircle size={12} className="text-gray-500" />
+                      )}
+                    </span>
                     <span className="text-xs text-gray-600 flex items-center gap-1 shrink-0">
                       <Clock size={10} />
                       {formatRelativeTime(entry.timestamp)}
@@ -181,6 +274,16 @@ const QuickCapture: React.FC<QuickCaptureProps> = ({ onCapture, isVisible = true
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="max-w-5xl mx-auto px-4 pb-1">
+          <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-1.5 inline-flex items-center gap-2">
+            <AlertCircle size={12} />
+            {toast}
           </div>
         </div>
       )}

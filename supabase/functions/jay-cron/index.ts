@@ -4,14 +4,15 @@
  * Jay's autonomous brain. Called by pg_cron on a schedule.
  * Scans for issues and sends notifications at the right level:
  *
+ *   Every 5 min:   Process-Captures (safety net for stuck quick_captures)
  *   Every 30 min:  Lead-Check (cold leads → Level 1 if >2h)
  *   Every 30 min:  Dev-Check (stale agent sessions → Level 2)
- *   Every 4 hours:  Flush Level 2 batch
- *   Daily 7am:  Morning briefing (Level 3)
- *   Daily 6pm:  Evening recap
+ *   Every 4 hours: Flush Level 2 batch
+ *   Daily 7am:     Morning briefing (Level 3)
+ *   Daily 6pm:     Evening recap
  *
  * Invoked via: POST /functions/v1/jay-cron
- * Body: { "job": "lead-check" | "dev-check" | "flush-batch" | "morning-briefing" | "evening-recap" }
+ * Body: { "job": "lead-check" | "dev-check" | "flush-batch" | "morning-briefing" | "evening-recap" | "process-captures" }
  *
  * Required secrets:
  *   TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
@@ -59,23 +60,57 @@ async function getAllChatIds(): Promise<number[]> {
 
 // ── Job: Lead Check ──────────────────────────────────────────
 // Level 1 (urgent) if lead is >2 hours old and untouched.
+// Idempotent: open business_events row gates duplicate Telegram spam,
+// and last_nudged_at enforces a 4-hour cooldown between re-nudges.
 
 async function leadCheck(): Promise<string> {
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
 
   const { data: coldLeads } = await supabase
     .from('leads')
-    .select('name, device_type, phone, created_at')
+    .select('id, user_id, name, device_type, phone, created_at, last_nudged_at')
     .eq('status', 'new')
     .lt('created_at', twoHoursAgo.toISOString())
+    .or(`last_nudged_at.is.null,last_nudged_at.lt.${fourHoursAgo}`)
     .order('created_at')
     .limit(5);
 
   if (!coldLeads?.length) return 'No cold leads.';
 
+  // Reserve an open business_events row per lead. If one already exists
+  // (partial unique index on user_id,event_type,entity_type,entity_id),
+  // ON CONFLICT skips it — and we skip the Telegram for that lead too.
+  const eventRows = coldLeads.map(l => ({
+    user_id: l.user_id,
+    event_type: 'lead_stale' as const,
+    entity_type: 'lead',
+    entity_id: l.id,
+    severity: 'urgent' as const,
+    payload: {
+      name: l.name,
+      device_type: l.device_type,
+      phone: l.phone,
+      age_minutes: Math.floor((Date.now() - new Date(l.created_at).getTime()) / 60000),
+    },
+  }));
+
+  const { data: inserted } = await supabase
+    .from('business_events')
+    .upsert(eventRows, {
+      onConflict: 'user_id,event_type,entity_type,entity_id',
+      ignoreDuplicates: true,
+    })
+    .select('entity_id');
+
+  const newlyOpened = new Set((inserted ?? []).map(r => r.entity_id as string));
+  const toNudge = coldLeads.filter(l => newlyOpened.has(l.id));
+
+  if (!toNudge.length) return 'All cold leads already have open nudges.';
+
   const chatIds = await getAllChatIds();
   const msg = `🔴 <b>COLD LEADS — Action Required</b>\n\n` +
-    coldLeads.map(l => {
+    toNudge.map(l => {
       const mins = Math.floor((Date.now() - new Date(l.created_at).getTime()) / 60000);
       const hours = Math.floor(mins / 60);
       const age = hours > 0 ? `${hours}h ${mins % 60}m` : `${mins}m`;
@@ -83,11 +118,30 @@ async function leadCheck(): Promise<string> {
     }).join('\n\n') +
     `\n\n<i>These leads are getting cold. Call now.</i>`;
 
+  let telegramOk = false;
   for (const chatId of chatIds) {
-    await sendTelegram(chatId, msg);
+    const ok = await sendTelegram(chatId, msg);
+    telegramOk = telegramOk || ok;
   }
 
-  return `Notified about ${coldLeads.length} cold leads.`;
+  // Cooldown stamp so we don't re-nudge within 4 hours, even if the
+  // business_events row is closed manually.
+  await supabase
+    .from('leads')
+    .update({ last_nudged_at: new Date().toISOString() })
+    .in('id', toNudge.map(l => l.id));
+
+  // Audit trail.
+  await supabase.from('jay_actions').insert({
+    user_id: toNudge[0].user_id,
+    action_type: 'lead_nudge',
+    status: telegramOk ? 'done' : 'failed',
+    source_table: 'leads',
+    output: { lead_ids: toNudge.map(l => l.id), count: toNudge.length, telegram_ok: telegramOk },
+    completed_at: new Date().toISOString(),
+  });
+
+  return `Notified about ${toNudge.length} cold leads.`;
 }
 
 // ── Job: Dev Check ───────────────────────────────────────────
@@ -177,6 +231,21 @@ async function morningBriefing(): Promise<string> {
     .lt('due_date', now.toISOString())
     .in('status', ['pending', 'in_progress']);
 
+  // Blocked
+  const { data: blocked } = await supabase
+    .from('agent_tasks')
+    .select('title, assignee')
+    .eq('status', 'blocked')
+    .order('updated_at', { ascending: false })
+    .limit(5);
+
+  // Open urgent business events (cold leads, bad reviews, etc.)
+  const { data: urgentEvents } = await supabase
+    .from('business_events')
+    .select('event_type, payload')
+    .eq('severity', 'urgent')
+    .is('handled_at', null);
+
   // Cold leads
   const { data: coldLeads } = await supabase
     .from('leads')
@@ -193,9 +262,21 @@ async function morningBriefing(): Promise<string> {
 
   let msg = `☀️ <b>Morning Briefing — ${now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</b>\n━━━━━━━━━━━━━━━━━━━━━━\n`;
 
+  if (urgentEvents?.length) {
+    msg += `\n🚨 <b>Urgent (${urgentEvents.length})</b>\n`;
+    const byType: Record<string, number> = {};
+    for (const e of urgentEvents) byType[e.event_type] = (byType[e.event_type] ?? 0) + 1;
+    msg += Object.entries(byType).map(([t, n]) => `  • ${t.replace(/_/g, ' ')}: ${n}`).join('\n');
+  }
+
   if (overdue?.length) {
-    msg += `\n🚨 <b>${overdue.length} Overdue</b>\n`;
+    msg += `\n\n⏰ <b>${overdue.length} Overdue</b>\n`;
     msg += overdue.map(t => `  • ${t.title} → ${agentEmojis[t.assignee] ?? '🤖'} ${t.assignee}`).join('\n');
+  }
+
+  if (blocked?.length) {
+    msg += `\n\n🛑 <b>Blocked (${blocked.length})</b>\n`;
+    msg += blocked.slice(0, 3).map(t => `  • ${t.title} → ${agentEmojis[t.assignee] ?? '🤖'} ${t.assignee}`).join('\n');
   }
 
   if (todayTasks?.length) {
@@ -208,12 +289,28 @@ async function morningBriefing(): Promise<string> {
       }
     }
   } else {
-    msg += `\n📭 No tasks due today.`;
+    msg += `\n\n📭 No tasks due today.`;
   }
 
   msg += `\n\n<b>Dashboard</b>`;
   msg += `\n  📬 New leads: ${coldLeads?.length ?? 0}`;
   msg += `\n  🏗️ Active projects: ${projects?.filter(p => p.status === 'active').length ?? 0}`;
+  // TODO: ReviewGuard pending count once review_events feed exists (plan section 8.4 / phase 5).
+  msg += `\n  📝 ReviewGuard pending: 0`;
+
+  // Jay recommendation — single-line heuristic so the boss has a starting move.
+  let recommendation: string;
+  if ((coldLeads?.length ?? 0) > 0) {
+    recommendation = 'Start with cold leads before repairs pile up.';
+  } else if (blocked?.length) {
+    const first = blocked[0];
+    recommendation = `Unblock ${first.assignee} first — they're stuck on "${first.title}".`;
+  } else if (overdue?.length) {
+    recommendation = 'Knock out overdue tasks before noon.';
+  } else {
+    recommendation = 'Day is clean. Pick the highest-priority task first.';
+  }
+  msg += `\n\n💡 <b>Jay recommends:</b> ${recommendation}`;
   msg += `\n\n<i>Use /today for full details, /nudge to check for issues.</i>`;
 
   const chatIds = await getAllChatIds();
@@ -287,13 +384,137 @@ async function eveningRecap(): Promise<string> {
   return 'Evening recap sent.';
 }
 
+// ── Job: Process Captures (safety net) ───────────────────────
+// quick-capture handles the happy path synchronously. This job sweeps
+// any quick_captures rows that got stuck in 'pending' (failed mid-flight,
+// or inserted via Telegram/voice paths that bypass the edge function).
+
+function localCaptureType(text: string): 'note' | 'task' | 'reminder' | 'money' | 'search' | 'review' {
+  const lower = text.toLowerCase().trim();
+  if (lower.startsWith('task:') || /\b(task|todo)\b/.test(lower)) return 'task';
+  if (/\bremind/.test(lower)) return 'reminder';
+  if (lower.startsWith('$') || /\btip\b/.test(lower)) return 'money';
+  if (/\b(search|find)\b/.test(lower)) return 'search';
+  if (/\breview\b/.test(lower)) return 'review';
+  return 'note';
+}
+
+async function processCaptures(): Promise<string> {
+  const cutoff = new Date(Date.now() - 60 * 1000).toISOString();
+  const { data: pending } = await supabase
+    .from('quick_captures')
+    .select('id, user_id, raw_text, source')
+    .eq('status', 'pending')
+    .lt('created_at', cutoff)
+    .order('created_at')
+    .limit(20);
+
+  if (!pending?.length) return 'No pending captures.';
+
+  let converted = 0;
+  let failed = 0;
+  const chatIds = await getAllChatIds();
+
+  for (const cap of pending) {
+    try {
+      const captureType = localCaptureType(cap.raw_text);
+      await supabase
+        .from('quick_captures')
+        .update({
+          capture_type: captureType,
+          status: 'parsed',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', cap.id);
+
+      if (captureType === 'task' || captureType === 'reminder') {
+        const title = cap.raw_text.replace(/^task:\s*/i, '').slice(0, 200);
+
+        const { data: task } = await supabase
+          .from('agent_tasks')
+          .insert({
+            user_id: cap.user_id,
+            title,
+            description: cap.raw_text.length > title.length ? cap.raw_text : null,
+            assignee: 'shuki',
+            created_by: 'shuki',
+            priority: 'medium',
+            status: 'pending',
+          })
+          .select('id')
+          .single();
+
+        if (task?.id) {
+          await supabase.from('agent_messages').insert({
+            user_id: cap.user_id,
+            task_id: task.id,
+            from_agent: 'shuki',
+            to_agent: 'jay',
+            message_type: 'status_update',
+            subject: 'New capture (safety-net)',
+            body: cap.raw_text,
+          });
+
+          await supabase
+            .from('quick_captures')
+            .update({ status: 'converted' })
+            .eq('id', cap.id);
+
+          for (const chatId of chatIds) {
+            await sendTelegram(chatId, `📥 Captured: <b>${title}</b> → assigned to shuki`);
+          }
+        }
+
+        await supabase.from('jay_actions').insert({
+          user_id: cap.user_id,
+          action_type: 'create_task',
+          source_table: 'quick_captures',
+          source_id: cap.id,
+          status: 'done',
+          output: { task_id: task?.id ?? null, capture_type: captureType, via: 'process-captures' },
+          completed_at: new Date().toISOString(),
+        });
+      } else {
+        await supabase.from('jay_actions').insert({
+          user_id: cap.user_id,
+          action_type: 'parse_capture',
+          source_table: 'quick_captures',
+          source_id: cap.id,
+          status: 'done',
+          output: { capture_type: captureType, via: 'process-captures' },
+          completed_at: new Date().toISOString(),
+        });
+      }
+      converted++;
+    } catch (err) {
+      failed++;
+      const message = err instanceof Error ? err.message : String(err);
+      await supabase
+        .from('quick_captures')
+        .update({ status: 'failed' })
+        .eq('id', cap.id);
+      await supabase.from('jay_actions').insert({
+        user_id: cap.user_id,
+        action_type: 'parse_capture',
+        source_table: 'quick_captures',
+        source_id: cap.id,
+        status: 'failed',
+        error: message,
+        completed_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  return `Processed ${converted} captures (${failed} failed).`;
+}
+
 // ── Main handler ─────────────────────────────────────────────
 
 serve(async (req) => {
   try {
     if (req.method !== 'POST') {
       return new Response(
-        JSON.stringify({ error: 'POST required', jobs: ['lead-check', 'dev-check', 'flush-batch', 'morning-briefing', 'evening-recap'] }),
+        JSON.stringify({ error: 'POST required', jobs: ['lead-check', 'dev-check', 'flush-batch', 'morning-briefing', 'evening-recap', 'process-captures'] }),
         { headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -332,6 +553,9 @@ serve(async (req) => {
         break;
       case 'evening-recap':
         result = await eveningRecap();
+        break;
+      case 'process-captures':
+        result = await processCaptures();
         break;
       default:
         return new Response(
