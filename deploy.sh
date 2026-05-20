@@ -49,15 +49,18 @@ echo "     - 20260209000002_create_notification_system.sql"
 echo "     - 20260209000003_create_cron_schedules.sql"
 echo ""
 
-# ── Step 4: Set Telegram bot token ────────────────────────────
-echo "[4/8] Setting Telegram bot token..."
+# ── Step 4: Set Telegram bot token + webhook secret ───────────
+echo "[4/8] Setting Telegram bot token and webhook secret..."
 read -p "  Enter your Telegram bot token from @BotFather: " BOT_TOKEN
 if [ -z "$BOT_TOKEN" ]; then
   echo "  ❌ No token provided. Skipping Telegram setup."
   echo "     Run later: supabase secrets set TELEGRAM_BOT_TOKEN=<your_token>"
 else
-  supabase secrets set TELEGRAM_BOT_TOKEN="$BOT_TOKEN"
-  echo "  ✅ Bot token saved"
+  WEBHOOK_SECRET=$(openssl rand -hex 32)
+  supabase secrets set \
+    TELEGRAM_BOT_TOKEN="$BOT_TOKEN" \
+    TELEGRAM_WEBHOOK_SECRET="$WEBHOOK_SECRET"
+  echo "  ✅ Bot token + generated webhook secret saved"
 fi
 echo ""
 
@@ -92,13 +95,17 @@ echo ""
 echo "[7/8] Setting Telegram webhook..."
 if [ -n "$BOT_TOKEN" ]; then
   WEBHOOK_URL="${SUPABASE_URL}/functions/v1/telegram-bot"
-  RESULT=$(curl -s "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook?url=${WEBHOOK_URL}")
+  RESULT=$(curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/setWebhook" \
+    -H "Content-Type: application/json" \
+    -d "{\"url\":\"${WEBHOOK_URL}\",\"secret_token\":\"${WEBHOOK_SECRET}\"}")
   echo "  Webhook URL: ${WEBHOOK_URL}"
   echo "  Response: ${RESULT}"
-  echo "  ✅ Webhook set"
+  echo "  ✅ Webhook set (with secret_token matching TELEGRAM_WEBHOOK_SECRET)"
 else
-  echo "  ⏭️  Skipped (no bot token). Run manually:"
-  echo "     curl https://api.telegram.org/bot<TOKEN>/setWebhook?url=${SUPABASE_URL}/functions/v1/telegram-bot"
+  echo "  ⏭️  Skipped (no bot token). Run manually with a webhook secret:"
+  echo "     curl -X POST https://api.telegram.org/bot<TOKEN>/setWebhook \\"
+  echo "       -H 'Content-Type: application/json' \\"
+  echo "       -d '{\"url\":\"${SUPABASE_URL}/functions/v1/telegram-bot\",\"secret_token\":\"<TELEGRAM_WEBHOOK_SECRET>\"}'"
 fi
 echo ""
 
